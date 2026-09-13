@@ -36,4 +36,7 @@ Each member reviews at least one other member's section.
 
 | Reviewer | Section reviewed | Improvement made |
 |----------|------------------|------------------|
+| Celestin | System Context Diagram (Valeriia) | Clear, well-labelled diagram — no changes needed to the diagram itself. Renamed the heading "Architecture Explanation" to "Context Diagram Explanation" so it does not clash with the container diagram's explanation, and matched the container diagram's colours and style to the context diagram for visual consistency. |
+|          |                  |                  |
+|          |                  |                  |
 |          |                  |                  |
