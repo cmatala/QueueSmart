@@ -29,9 +29,27 @@
 
 ### Agile / Scrum
 
+QueueSmart will be developed using Agile principles with Scrum-inspired practices. 
+
 ### Why It Fits QueueSmart
 
+An Agile, Scrum-inspired approach fits QueueSmart well for a few reasons. One reason is the project structure mirrors a sprint-based process, where each assignment builds a new layer of the system. QueueSmart also involves multiple interacting design components including the system context, architecture, UI/UX, and data. Agile's emphasis on regular review and revision will help us catch inconsistencies before it becomes a larger problem. Additionally, since our team is small, Agile's focus on frequent communication and incremental delivery keeps everyone aligned.
+
 ### Team Workflow
+
+For each assignment our team will follow a consistent workflow:
+
+Plan -> Divide Tasks -> Complete Individual Work -> GitHub Commit -> Team Review -> Revise -> Submit
+
+Plan - We will meet to review the assignment requirements and agree on the design
+Divide Tasks - Each requirement is assigned to a specific member based on the breakdown of responsibilities
+Complete Individual Work - Each member will independently complete their assigned section
+GitHub Commit - Members commit their work to the shared repository under their own GitHub account
+Team Review - Once all sections are committed, the team reviews the combined document together, checking for consistency in terminology, diagrams, and design decisions
+Revise - Any inconsistencies or gaps identified during the review are corrected
+Submit - The finalized document is submitted
+
+This cycle will repeat for each assignment, allowing us to revisit and improve earlier decisions as QueueSmart's design gets refined.
 
 ---
 
