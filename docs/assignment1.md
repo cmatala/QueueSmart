@@ -15,12 +15,16 @@
 <!-- Owner: Celeste -->
 
 ### Main Users
+The main users of the QueueSmart application will be customers and administrators.
 
 ### User Interaction
+The user interactions will differ depending on the user. For customers, they will be able to join a queue or leave a queue for a particular service, view their current position in the queue, and view estimated wait time through the application. For administrators, they will be able to create services by naming the service, describing what the service is, assign the priority level of the service which ranges from low, medium, high, and assign an expected service length as well. In addition to the creation of services, administrators will be able to open and close queues, remove users or reorder a given queue, and serve the next customer in a given queue.
 
 ### Important Features
+The important features of the QueueSmart application include authentication of accounts, email notifications of upcoming turn, real time queue updates, queue management, queue history tracking, estimation for wait times, and selection of services.
 
 ### Challenges
+Challenges that we are expecting to face are handling priorities of services fairly, deciding when to send notifications to customers (such as start notifying them when they're one person behind the current customer or when they are the next customer), ensuring that wait times are accurate for customers, and updating the positions of customers within a queue. Keeping these challenges in mind is important to prevent disruptions of any queue managed by the application.
 
 ---
 
