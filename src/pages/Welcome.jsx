@@ -1,0 +1,6 @@
+// OWNER: Celeste
+// TODO: see the A2 plan for what this screen must do.
+
+export default function Welcome() {
+  return <h1>Welcome</h1>;
+}
