@@ -1,0 +1,335 @@
+/* QueueSmart — shared styles
+   Design rules agreed at the A2 meeting:
+     blue   = primary actions (Join, Save, Sign in, Serve next)
+     green  = open queues, served status, success
+     amber  = waiting / almost ready status
+     red    = destructive actions only (Leave, Remove, Close) and validation errors
+   Use these classes instead of writing new CSS. If you need something that
+   isn't here, say so in the group chat so we all get it. */
+
+/* ---------- design tokens ---------- */
+
+:root {
+  --navy: #1b2a4a;
+  --ink-soft: #5a6472;
+  --ink-faint: #8a93a1;
+
+  --blue: #2563c9;
+  --blue-dark: #1b4ca0;
+  --blue-tint: #e8f0fd;
+
+  --green: #1f7a53;
+  --green-tint: #e3f3ec;
+  --amber: #9a6207;
+  --amber-tint: #fdf0da;
+  --red: #c0392b;
+  --red-tint: #fbeae8;
+
+  --line: #d7dbe2;
+  --surface: #ffffff;
+  --page: #f4f6f9;
+
+  --radius: 6px;
+  --gap: 1rem;
+  --shell: 1080px;
+}
+
+/* ---------- base ---------- */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--navy);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+h1, h2, h3 { line-height: 1.2; margin: 0 0 .4em; font-weight: 650; }
+h1 { font-size: 1.6rem; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; }
+p  { margin: 0 0 1em; max-width: 68ch; }
+a  { color: var(--blue-dark); }
+
+/* ---------- layout ----------
+   .shell   wraps every page's content
+   .grid    auto-fitting columns of cards (services, etc.)
+   .stack   vertical list with even spacing
+   .split   main area + sidebar, stacks on narrow screens  */
+
+.shell {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 4rem;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.page-head p { margin: 0; color: var(--ink-soft); }
+
+.grid {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.stack { display: grid; gap: var(--gap); }
+
+.split {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+}
+
+@media (max-width: 800px) {
+  .split { grid-template-columns: 1fr; }
+}
+
+/* ---------- top navigation ---------- */
+
+.nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.nav-inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: .7rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--navy);
+  text-decoration: none;
+}
+
+.nav-links { display: flex; gap: .25rem; flex-wrap: wrap; margin-left: auto; }
+
+.nav-links a {
+  padding: .35rem .6rem;
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: .92rem;
+}
+
+.nav-links a:hover { background: var(--blue-tint); color: var(--blue-dark); }
+.nav-links a.active { background: var(--blue); color: #fff; }
+
+/* ---------- cards ---------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+}
+
+/* highlighted card — the user's current queue, the person being served next */
+.card-hilite {
+  background: var(--blue-tint);
+  border-color: var(--blue);
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .75rem;
+  margin-bottom: .5rem;
+}
+
+.muted { color: var(--ink-soft); font-size: .92rem; }
+.faint { color: var(--ink-faint); font-size: .85rem; }
+
+/* ---------- badges ----------
+   priority: .badge-low .badge-medium .badge-high
+   status:   .badge-open .badge-closed .badge-waiting .badge-served  */
+
+.badge {
+  display: inline-block;
+  padding: .12rem .5rem;
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge-low,
+.badge-open,
+.badge-served   { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+
+.badge-medium,
+.badge-waiting  { background: var(--amber-tint); color: var(--amber); border-color: var(--amber); }
+
+.badge-high     { background: var(--red-tint); color: var(--red); border-color: var(--red); }
+
+.badge-closed   { background: #eef0f3; color: var(--ink-soft); border-color: var(--line); }
+
+/* ---------- buttons ----------
+   .btn-primary  blue, the main action on a screen
+   .btn-danger   red, destructive only
+   .btn-quiet    borderless, for secondary actions  */
+
+button, .btn {
+  font: inherit;
+  font-size: .92rem;
+  font-weight: 550;
+  padding: .45rem .85rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--navy);
+  cursor: pointer;
+}
+
+button:hover, .btn:hover { border-color: var(--ink-faint); }
+
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.btn-primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--blue-dark); border-color: var(--blue-dark); }
+
+.btn-danger { color: var(--red); }
+.btn-danger:hover { background: var(--red-tint); border-color: var(--red); }
+
+.btn-quiet { background: transparent; border-color: transparent; color: var(--ink-soft); }
+.btn-quiet:hover { background: #eef0f3; }
+
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-row { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+/* ---------- forms ----------
+   Structure each field like this:
+     <div class="field">
+       <label for="email">Email</label>
+       <input id="email" aria-invalid="true" />
+       <span class="error">Enter a valid email address.</span>
+     </div>
+   aria-invalid="true" turns the border red and tells screen readers. */
+
+.field { margin-bottom: 1rem; }
+
+.field label {
+  display: block;
+  font-size: .9rem;
+  font-weight: 600;
+  margin-bottom: .3rem;
+}
+
+.field input, .field select, .field textarea {
+  font: inherit;
+  width: 100%;
+  padding: .5rem .6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--navy);
+}
+
+.field textarea { min-height: 5rem; resize: vertical; }
+
+.field input[aria-invalid="true"],
+.field select[aria-invalid="true"],
+.field textarea[aria-invalid="true"] { border-color: var(--red); }
+
+.error { display: block; margin-top: .3rem; color: var(--red); font-size: .85rem; }
+.hint  { display: block; margin-top: .3rem; color: var(--ink-faint); font-size: .82rem; }
+
+/* centred form card — Login, Registration */
+.form-card { max-width: 420px; margin: 3rem auto; }
+
+/* ---------- queue rows ----------
+   <div class="queue-row is-next">
+     <span class="pos">1</span>
+     <div><div class="row-name">Jordan Reyes</div><div class="faint">joined 09:05</div></div>
+     <div class="btn-row">…</div>
+   </div>  */
+
+.queue-list { display: grid; gap: .5rem; }
+
+.queue-row {
+  display: grid;
+  grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+  gap: .75rem;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .6rem .8rem;
+}
+
+.queue-row.is-next { border-color: var(--blue); background: var(--blue-tint); }
+
+.pos { font-weight: 700; font-size: 1.05rem; color: var(--ink-faint); text-align: center; }
+.queue-row.is-next .pos { color: var(--blue-dark); }
+
+.row-name { font-weight: 600; }
+
+/* ---------- tables — History ---------- */
+
+.table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+
+.table th {
+  text-align: left;
+  font-size: .85rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  padding: .5rem .6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.table td { padding: .6rem; border-bottom: 1px solid var(--line); }
+.table tr:last-child td { border-bottom: none; }
+
+/* ---------- notifications ---------- */
+
+.note {
+  padding: .6rem .75rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.note.unread { border-left-color: var(--blue); }
+.note p { margin: 0; font-size: .92rem; }
+
+/* ---------- empty state ---------- */
+
+.empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
