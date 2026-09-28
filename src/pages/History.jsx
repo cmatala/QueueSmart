@@ -26,13 +26,13 @@ export default function History(){
           You do not have any previous visits.
         </div>
       ) : (
-        <div className="card">
-          <div className="table">
-            {userHistory.map((visit) => {
-              const service = getService(visit.serviceId)
+        <div className="stack">
+          {userHistory.map((visit) => {
+            const service = getService(visit.serviceId)
 
-              return(
-                <div className="queue-row" key={visit.id}>
+            return(
+              <div className="card" key={visit.id}>
+                <div className="card-head">
                   <div>
                     <div className="row-name">
                       {service.name}
@@ -43,19 +43,17 @@ export default function History(){
                     </div>
                   </div>
 
-                  <div>
-                    <StatusBadge status={visit.outcome} />
-                  </div>
-
-                  <div className="hint">
-                    {visit.outcome === 'no-show'
-                      ? 'No wait'
-                      : `${visit.waitedMinutes} min`}
-                  </div>
+                  <StatusBadge status={visit.outcome} />
                 </div>
-              )
-            })}
-          </div>
+
+                <div className="hint">
+                  {visit.outcome === 'no-show'
+                    ? 'No wait'
+                    : `${visit.waitedMinutes} min`}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

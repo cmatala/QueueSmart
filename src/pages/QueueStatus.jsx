@@ -82,7 +82,7 @@ export default function QueueStatus(){
       </div>
 
       <div className="stack">
-        <h2>Updates</h2>
+        <h2 style={{ marginTop: '20px' }}>Updates</h2>
 
         {userNotifications.map((notification) => (
           <Notification
