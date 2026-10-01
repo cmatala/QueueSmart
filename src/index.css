@@ -45,11 +45,12 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.55;
+  overflow-wrap: break-word;
 }
 
 h1, h2, h3 { line-height: 1.2; margin: 0 0 .4em; font-weight: 650; }
-h1 { font-size: 1.6rem; }
-h2 { font-size: 1.2rem; }
+h1 { font-size: clamp(1.35rem, 5vw, 1.6rem); }
+h2 { font-size: clamp(1.1rem, 4vw, 1.2rem); }
 h3 { font-size: 1rem; }
 p  { margin: 0 0 1em; max-width: 68ch; }
 a  { color: var(--blue-dark); }
@@ -291,9 +292,13 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .row-name { font-weight: 600; }
 
-/* ---------- tables — History ---------- */
+/* ---------- tables — History ----------
+   Wrap the table in .table-wrap so it scrolls inside its own box
+   on narrow screens instead of widening the whole page. */
 
-.table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+.table-wrap { overflow-x: auto; }
+
+.table { width: 100%; border-collapse: collapse; font-size: .95rem; min-width: 34rem; }
 
 .table th {
   text-align: left;
@@ -328,6 +333,39 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   padding: 2rem 1rem;
   text-align: center;
   color: var(--ink-soft);
+}
+
+/* ---------- responsive ----------
+   Breakpoints: 800px (tablet) and 560px (phone). */
+
+@media (max-width: 800px) {
+  .shell { padding: 1.25rem 1rem 3rem; }
+
+  /* Page heading and its buttons stack instead of sitting side by side. */
+  .page-head { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 560px) {
+  /* Nav: brand on its own line, links wrap below it. */
+  .nav-inner { gap: .5rem; padding: .6rem 1rem; }
+  .nav-links { margin-left: 0; width: 100%; }
+  .nav-links a { font-size: .88rem; padding: .3rem .5rem; }
+
+  /* Queue rows: number and name on top, buttons on a second line. */
+  .queue-row { grid-template-columns: 2rem 1fr; row-gap: .5rem; }
+  .queue-row .btn-row { grid-column: 1 / -1; justify-content: flex-start; }
+
+  /* Comfortable tap targets. */
+  button, .btn { padding: .55rem .9rem; }
+
+  .form-card { margin: 1.5rem auto; }
+  .card { padding: .9rem; }
+}
+
+/* Very narrow phones — stop side-by-side buttons overflowing. */
+@media (max-width: 380px) {
+  .btn-row { width: 100%; }
+  .btn-row > button, .btn-row > .btn { flex: 1 1 auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {
