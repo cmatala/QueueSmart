@@ -59,7 +59,14 @@ export default function App() {
         {/* user screens */}
         <Route
           path="/dashboard"
-          element={<UserDashboard account={account} services={services} entries={entries} />}
+          element={
+            <UserDashboard
+              account={account}
+              services={services}
+              entries={entries}
+              setEntries={setEntries}
+            />
+          }
         />
         <Route
           path="/join"

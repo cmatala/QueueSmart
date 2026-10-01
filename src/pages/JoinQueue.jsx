@@ -10,12 +10,23 @@ import { joinQueue, leaveQueue, positionIn } from '../utils/queueActions';
 export default function JoinQueue({ services, entries, setEntries }) {
   const [message, setMessage] = useState('');
 
+  const canUpdate = () => {
+    if (typeof setEntries !== 'function') {
+      console.error('JoinQueue: setEntries was not passed in. Check the route in App.jsx.');
+      setMessage('Could not update the queue: App.jsx is not passing setEntries to this page.');
+      return false;
+    }
+    return true;
+  };
+
   const handleJoin = (service) => {
+    if (!canUpdate()) return;
     setEntries(joinQueue(entries, service));
     setMessage(`You joined ${service.name}.`);
   };
 
   const handleLeave = (service) => {
+    if (!canUpdate()) return;
     setEntries(leaveQueue(entries, service.id));
     setMessage(`You left ${service.name}.`);
   };
