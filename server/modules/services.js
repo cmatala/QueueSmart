@@ -5,7 +5,7 @@
 // Every function returns ok(data) on success or fail(message, status) on
 // failure. Import those from ../validation.js.
 //
-// TODO Megan — implement:
+// TODO Megan - implement:
 //
 //   listServices()
 //     Returns every service with a `waiting` count added, so the screens do

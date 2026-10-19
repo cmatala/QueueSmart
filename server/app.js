@@ -1,4 +1,4 @@
-// OWNER: Celestin — shared file, say something in the group chat before changing it.
+// OWNER: Celestin - shared file, say something in the group chat before changing it.
 //
 // The Express server. Registers every route file under /api and starts
 // listening on port 3001. Vite proxies /api here during development, so the

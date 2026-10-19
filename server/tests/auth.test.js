@@ -1,6 +1,6 @@
 // OWNER: Celeste
 //
-// Tests for auth.js — registerUser, loginUser, requireAdmin
+// Tests for auth.js - registerUser, loginUser, requireAdmin
 //
 // See store.test.js for a worked example. The shape of a test is always:
 // set up some data, call the function, check the result.

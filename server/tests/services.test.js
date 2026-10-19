@@ -1,6 +1,6 @@
 // OWNER: Megan
 //
-// Tests for services.js — listServices, createService, updateService, setServiceOpen
+// Tests for services.js - listServices, createService, updateService, setServiceOpen
 //
 // See store.test.js for a worked example. The shape of a test is always:
 // set up some data, call the function, check the result.

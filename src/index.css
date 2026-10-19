@@ -1,4 +1,4 @@
-/* QueueSmart — shared styles
+/* QueueSmart - shared styles
    Design rules agreed at the A2 meeting:
      blue   = primary actions (Join, Save, Sign in, Serve next)
      green  = open queues, served status, success
@@ -145,7 +145,7 @@ a  { color: var(--blue-dark); }
   padding: 1.1rem;
 }
 
-/* highlighted card — the user's current queue, the person being served next */
+/* highlighted card - the user's current queue, the person being served next */
 .card-hilite {
   background: var(--blue-tint);
   border-color: var(--blue);
@@ -262,7 +262,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .error { display: block; margin-top: .3rem; color: var(--red); font-size: .85rem; }
 .hint  { display: block; margin-top: .3rem; color: var(--ink-faint); font-size: .82rem; }
 
-/* centred form card — Login, Registration */
+/* centred form card - Login, Registration */
 .form-card { max-width: 420px; margin: 3rem auto; }
 
 /* ---------- queue rows ----------
@@ -292,7 +292,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 .row-name { font-weight: 600; }
 
-/* ---------- tables — History ----------
+/* ---------- tables - History ----------
    Wrap the table in .table-wrap so it scrolls inside its own box
    on narrow screens instead of widening the whole page. */
 
@@ -362,7 +362,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .card { padding: .9rem; }
 }
 
-/* Very narrow phones — stop side-by-side buttons overflowing. */
+/* Very narrow phones - stop side-by-side buttons overflowing. */
 @media (max-width: 380px) {
   .btn-row { width: 100%; }
   .btn-row > button, .btn-row > .btn { flex: 1 1 auto; }
@@ -370,4 +370,15 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
+}
+
+a.btn-primary,
+a.btn-primary:visited {
+  color: #fff;
+}
+
+a.btn-primary:hover,
+a.btn-primary:focus,
+a.btn-primary:active {
+  color: var(--navy) !important;
 }

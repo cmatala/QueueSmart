@@ -92,7 +92,7 @@ export default function App() {
         />
         <Route path="/history" element={<History account={account} />} />
 
-        {/* admin screens — a regular user is sent back to their own dashboard */}
+        {/* admin screens - a regular user is sent back to their own dashboard */}
         <Route
           path="/admin"
           element={

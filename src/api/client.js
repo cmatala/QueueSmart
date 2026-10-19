@@ -1,4 +1,4 @@
-// OWNER: Celestin — shared file, say something in the group chat before changing it.
+// OWNER: Celestin - shared file, say something in the group chat before changing it.
 //
 // Every network call the front end makes lives here. Screens import these
 // functions and never write fetch themselves, so changing a URL means editing

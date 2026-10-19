@@ -1,7 +1,7 @@
 // OWNER: Celeste
 //
 // The checks every form reuses. Each returns an error message string,
-// or null when the value is fine — so a screen can do:
+// or null when the value is fine - so a screen can do:
 //
 //   const error = isValidEmail(email);
 //   if (error) setErrors({ ...errors, email: error });

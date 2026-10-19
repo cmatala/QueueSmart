@@ -6,10 +6,10 @@ QueueSmart is a responsive web-based smart queue management application.
 
 ## Team Members
 
-- Celestin Matala (@cmatala) — Architecture & Container Diagram
-- Celeste (@celesteis-blue) — Initial Thoughts
-- Megan (@megamind-28) — Development Methodology
-- Valeriia (@vkrokhot) — System Context Diagram
+- Celestin Matala (@cmatala) - Architecture & Container Diagram
+- Celeste (@celesteis-blue) - Initial Thoughts
+- Megan (@megamind-28) - Development Methodology
+- Valeriia (@vkrokhot) - System Context Diagram
 
 ## Design Decisions
 
@@ -22,10 +22,10 @@ QueueSmart is a responsive web-based smart queue management application.
 
 ## Repository Structure
 
-- `README.md` — Project overview
-- `docs/assignment1.md` — Main Assignment 1 document
-- `docs/diagrams/` — Architecture diagrams
-- `CONTRIBUTIONS.md` — Team member contributions
+- `README.md` - Project overview
+- `docs/assignment1.md` - Main Assignment 1 document
+- `docs/diagrams/` - Architecture diagrams
+- `CONTRIBUTIONS.md` - Team member contributions
 
 ## Workflow
 

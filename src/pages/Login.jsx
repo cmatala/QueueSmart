@@ -97,7 +97,7 @@ export default function Login({ onSignIn }) {
           <strong className="faint">Demo accounts</strong>
           <div className="faint">User: alex@queuesmart.edu</div>
           <div className="faint">Admin: admin@queuesmart.edu</div>
-          <div className="faint">Any password works — there is no backend yet.</div>
+          <div className="faint">Any password works - there is no backend yet.</div>
         </div>
       </form>
     </div>

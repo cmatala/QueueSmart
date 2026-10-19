@@ -67,7 +67,7 @@ export default function Welcome() {
         </div>
 
         <p className="faint" style={{ marginTop: '2rem' }}>
-          Staff members use the same <Link to="/login">Sign in</Link> — administrator
+          Staff members use the same <Link to="/login">Sign in</Link> - administrator
           accounts open the admin dashboard.
         </p>
       </div>

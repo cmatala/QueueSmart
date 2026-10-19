@@ -1,6 +1,6 @@
 // OWNER: Celestin
 //
-// Tests for notifications.js — notifyJoined, notifyAlmostReady, getNotifications
+// Tests for notifications.js - notifyJoined, notifyAlmostReady, getNotifications
 //
 // See store.test.js for a worked example. The shape of a test is always:
 // set up some data, call the function, check the result.
