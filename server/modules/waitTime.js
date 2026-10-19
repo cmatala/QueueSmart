@@ -1,24 +1,31 @@
 // OWNER: Valeriia
-//
-// Wait-time estimation. This is the A1 decision, unchanged:
-// people ahead x the service's expected duration.
-//
-// These two return plain values, not ok()/fail(), because they are pure
-// calculations that other modules call.
-//
-// TODO Valeriia — implement:
-//
-//   estimateWait(peopleAhead, serviceId) -> minutes
-//     Returns 0 for an unknown service rather than crashing.
-//
-//   formatWait(minutes) -> 'Next up' | '20 min' | '1 hr 15 min'
-
 import { findService } from '../data/store.js';
 
-export function estimateWait(peopleAhead, serviceId) {
-  return 0;
+export function estimateWait(peopleAhead, serviceId){
+  const service = findService(serviceId);
+
+  if(!service){
+    return 0;
+  }
+
+  return peopleAhead * service.expectedDuration;
 }
 
-export function formatWait(minutes) {
-  return '';
+export function formatWait(minutes){
+  if(minutes <= 0){
+    return 'Next up';
+  }
+
+  if(minutes < 60){
+    return `${minutes} min`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if(remainingMinutes === 0){
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${remainingMinutes} min`;
 }
