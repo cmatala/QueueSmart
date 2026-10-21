@@ -1,147 +1,168 @@
 // OWNER: Celestin
-// View a service queue, reorder, remove, serve next.
+//
+// The staff view of one queue: reorder it, remove someone, serve the next
+// person.
+//
+// Every action reloads from the server afterwards. That is slightly more
+// network traffic than patching the list in place, but it means the screen
+// can never show an order the server disagrees with, which matters most on
+// the one screen two staff might have open at once.
 
-import { useState } from 'react';
-import QueueCard from '../components/QueueCard';
-import {
-  getQueue,
-  getUser,
-  estimateWait,
-  formatWait,
-  STATUS,
-} from '../data/mockData';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
-export default function QueueManagement({ services, entries, setEntries }) {
-  const [serviceId, setServiceId] = useState(services[0]?.id ?? '');
-  const [message, setMessage] = useState('');
+import { getServices, getQueue, serveNext, moveEntry, leaveQueue } from '../api/client';
+
+export default function QueueManagement() {
+  const [params, setParams] = useSearchParams();
+
+  const [services, setServices] = useState([]);
+  const [serviceId, setServiceId] = useState(params.get('service') ?? '');
+  const [queue, setQueue] = useState([]);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  // Load the service list once, and pick the first one if the URL did not
+  // name a service.
+  useEffect(() => {
+    getServices()
+      .then((data) => {
+        setServices(data);
+        setServiceId((current) => current || data[0]?.id || '');
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const loadQueue = useCallback(async (id) => {
+    if (!id) return;
+    try {
+      setQueue(await getQueue(id));
+      setError('');
+    } catch (e) {
+      setError(e.message);
+      setQueue([]);
+    }
+  }, []);
+
+  useEffect(() => { loadQueue(serviceId); }, [serviceId, loadQueue]);
+
+  const chooseService = (id) => {
+    setServiceId(id);
+    setParams(id ? { service: id } : {});
+    setNotice('');
+  };
+
+  // Wraps an action so that every one of them reloads and reports the same way.
+  const run = async (action, success) => {
+    setBusy(true);
+    setNotice('');
+    try {
+      await action();
+      setNotice(success);
+      setError('');
+      await Promise.all([
+        loadQueue(serviceId),
+        getServices().then(setServices),
+      ]);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <div className="shell"><p className="muted">Loading…</p></div>;
 
   const service = services.find((s) => s.id === serviceId);
-  const queue = getQueue(entries, serviceId);
-
-  // Move an entry up or down by swapping it with its neighbour, then
-  // writing the reordered queue back into the full entries list.
-  const move = (entryId, direction) => {
-    const index = queue.findIndex((e) => e.id === entryId);
-    const target = index + direction;
-    if (index < 0 || target < 0 || target >= queue.length) return;
-
-    const movedName = getUser(queue[index].userId)?.name ?? 'Entry';
-
-    const reordered = [...queue];
-    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-
-    let slot = 0;
-    setEntries(
-      entries.map((entry) =>
-        entry.serviceId === serviceId && entry.status === STATUS.WAITING
-          ? reordered[slot++]
-          : entry,
-      ),
-    );
-    setMessage(`Moved ${movedName} ${direction < 0 ? 'up' : 'down'}.`);
-  };
-
-  const remove = (entryId) => {
-    const entry = queue.find((e) => e.id === entryId);
-    const name = getUser(entry?.userId)?.name ?? 'Entry';
-    setEntries(entries.filter((e) => e.id !== entryId));
-    setMessage(`Removed ${name} from the queue.`);
-  };
-
-  const serveNext = () => {
-    const next = queue[0];
-    if (!next) return;
-    const name = getUser(next.userId)?.name ?? 'Next person';
-    setEntries(
-      entries.map((e) => (e.id === next.id ? { ...e, status: STATUS.SERVED } : e)),
-    );
-    setMessage(`${name} marked as served.`);
-  };
 
   return (
     <div className="shell">
       <div className="page-head">
         <div>
-          <h1>Queue management</h1>
-          <p>Reorder, remove, or serve the people waiting for a service.</p>
+          <h1>Queues</h1>
+          <p>Reorder, remove, or serve the next person.</p>
         </div>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={serveNext}
-          disabled={queue.length === 0}
-        >
-          Serve next
-        </button>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={busy || queue.length === 0}
+            onClick={() => run(() => serveNext(serviceId), 'Served the next person.')}
+          >
+            Serve next
+          </button>
+        </div>
       </div>
 
-      <div className="field" style={{ maxWidth: '320px' }}>
-        <label htmlFor="svc-select">Service</label>
-        <select
-          id="svc-select"
-          value={serviceId}
-          onChange={(event) => {
-            setServiceId(event.target.value);
-            setMessage('');
-          }}
-        >
+      <div className="field" style={{ maxWidth: 320 }}>
+        <label htmlFor="service">Service</label>
+        <select id="service" value={serviceId} onChange={(e) => chooseService(e.target.value)}>
           {services.map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.waiting} waiting){s.isOpen ? '' : ' — closed'}
+            </option>
           ))}
         </select>
       </div>
 
+      {error && <p className="error" role="alert">{error}</p>}
+      {notice && <p className="muted" role="status">{notice}</p>}
+
       {service && (
-        <p className="muted">
-          {queue.length} waiting · {service.expectedDuration} min per visit ·{' '}
-          {service.isOpen ? 'queue open' : 'queue closed'}
+        <p className="faint">
+          {service.expectedDuration} min per visit · {queue.length} waiting
         </p>
       )}
 
-      {message && <p className="hint">{message}</p>}
-
       {queue.length === 0 ? (
-        <div className="empty">Nobody is waiting for this service right now.</div>
+        <div className="empty"><p>Nobody is waiting for this service.</p></div>
       ) : (
         <div className="queue-list">
-          {queue.map((entry, index) => {
-            const person = getUser(entry.userId);
-            const wait = formatWait(estimateWait(index, serviceId));
-            return (
-              <QueueCard
-                key={entry.id}
-                position={index + 1}
-                name={person?.name ?? 'Unknown user'}
-                detail={`joined ${entry.joinedAt} · ${entry.priority} priority · about ${wait}`}
-                status={index === 0 ? STATUS.ALMOST_READY : entry.status}
-                actions={
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => move(entry.id, -1)}
-                      disabled={index === 0}
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => move(entry.id, 1)}
-                      disabled={index === queue.length - 1}
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      onClick={() => remove(entry.id)}
-                    >
-                      Remove
-                    </button>
-                  </>
-                }
-              />
-            );
-          })}
+          {queue.map((entry) => (
+            <div
+              key={entry.id}
+              className={`queue-row${entry.position === 1 ? ' is-next' : ''}`}
+            >
+              <span className="pos">{entry.position}</span>
+
+              <div>
+                <div className="row-name">{entry.userName}</div>
+                <div className="faint">
+                  joined {entry.joinedAt} · about {entry.wait} min
+                </div>
+              </div>
+
+              <div className="btn-row">
+                <button
+                  type="button"
+                  disabled={busy || entry.position === 1}
+                  onClick={() => run(() => moveEntry(entry.id, 'up'), 'Moved up.')}
+                  aria-label={`Move ${entry.userName} up`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || entry.position === queue.length}
+                  onClick={() => run(() => moveEntry(entry.id, 'down'), 'Moved down.')}
+                  aria-label={`Move ${entry.userName} down`}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger"
+                  disabled={busy}
+                  onClick={() => run(() => leaveQueue(entry.id), `Removed ${entry.userName}.`)}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

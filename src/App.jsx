@@ -1,5 +1,13 @@
+// OWNER: Celestin — shared file
+//
+// Routing and the signed-in account.
+//
+// A2 kept the services and queue entries in App state so every screen saw the
+// same data. A3 does not: each screen fetches what it needs from the API, and
+
+
 import { useState } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
 import Navbar from './components/Navbar';
 import Welcome from './pages/Welcome';
@@ -13,34 +21,49 @@ import AdminDashboard from './pages/AdminDashboard';
 import ServiceManagement from './pages/ServiceManagement';
 import QueueManagement from './pages/QueueManagement';
 
-import { services as seedServices, queueEntries as seedEntries } from './data/mockData';
+const STORAGE_KEY = 'queuesmart.account';
+
+/**
+ * Reads the signed-in account back from sessionStorage.
+ *
+ * Typing a URL into the address bar is a full page reload, which wipes React
+ * state. Without this, visiting /admin directly would look like being signed
+ * out. sessionStorage clears when the tab closes, which is the behaviour we
+ * want for a shared campus computer.
+ */
+function storedAccount() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function App() {
-  // The signed-in account, or null. No backend in A2, so this is React state.
-  // sessionStorage keeps it across a page reload, so refreshing does not sign
-  // you out. It clears when the tab closes.
-  const [account, setAccount] = useState(() => {
-    const saved = sessionStorage.getItem('qs-account');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  // Shared app state, so a change made on one screen shows on the others.
-  const [services, setServices] = useState(seedServices);
-  const [entries, setEntries] = useState(seedEntries);
-
-  const isAdmin = account?.role === 'admin';
+  // The function form runs once, on first render, instead of on every render.
+  const [account, setAccount] = useState(storedAccount);
 
   const signIn = (user) => {
-    sessionStorage.setItem('qs-account', JSON.stringify(user));
     setAccount(user);
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+    } catch {
+      // A browser with storage blocked still works, it just forgets on reload.
+    }
   };
 
   const signOut = () => {
-    sessionStorage.removeItem('qs-account');
     setAccount(null);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Nothing to do; the state above is what the UI reads.
+    }
   };
 
-  // Not signed in: only the public screens are reachable.
+  const home = account?.role === 'admin' ? '/admin' : '/dashboard';
+
   if (!account) {
     return (
       <Routes>
@@ -54,90 +77,36 @@ export default function App() {
 
   return (
     <>
-      <Navbar role={account.role} onSignOut={signOut} />
+      <Navbar account={account} onSignOut={signOut} />
       <Routes>
-        {/* user screens */}
-        <Route
-          path="/dashboard"
-          element={
-            <UserDashboard
-              account={account}
-              services={services}
-              entries={entries}
-              setEntries={setEntries}
-            />
-          }
-        />
-        <Route
-          path="/join"
-          element={
-            <JoinQueue
-              account={account}
-              services={services}
-              entries={entries}
-              setEntries={setEntries}
-            />
-          }
-        />
-        <Route
-          path="/status"
-          element={
-            <QueueStatus
-              account={account}
-              services={services}
-              entries={entries}
-              setEntries={setEntries}
-            />
-          }
-        />
+        <Route path="/dashboard" element={<UserDashboard account={account} />} />
+        <Route path="/join" element={<JoinQueue account={account} />} />
+        <Route path="/status" element={<QueueStatus account={account} />} />
         <Route path="/history" element={<History account={account} />} />
 
-        {/* admin screens — a regular user is sent back to their own dashboard */}
+        {/* Admin screens. A non-admin who types the URL is sent to their own
+            dashboard. The server checks this too, which is the check that
+            actually matters: this one is only for tidiness. */}
         <Route
           path="/admin"
-          element={
-            isAdmin ? (
-              <AdminDashboard
-                services={services}
-                setServices={setServices}
-                entries={entries}
-              />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
+          element={account.role === 'admin'
+            ? <AdminDashboard account={account} />
+            : <Navigate to="/dashboard" replace />}
         />
         <Route
           path="/admin/services"
-          element={
-            isAdmin ? (
-              <ServiceManagement
-                services={services}
-                setServices={setServices}
-                setEntries={setEntries}
-              />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
+          element={account.role === 'admin'
+            ? <ServiceManagement account={account} />
+            : <Navigate to="/dashboard" replace />}
         />
         <Route
           path="/admin/queues"
-          element={
-            isAdmin ? (
-              <QueueManagement
-                services={services}
-                entries={entries}
-                setEntries={setEntries}
-              />
-            ) : (
-              <Navigate to="/dashboard" replace />
-            )
-          }
+          element={account.role === 'admin'
+            ? <QueueManagement account={account} />
+            : <Navigate to="/dashboard" replace />}
         />
 
-        {/* anything else goes to the right home screen for the role */}
-        <Route path="*" element={<Navigate to={isAdmin ? '/admin' : '/dashboard'} replace />} />
+        <Route path="*" element={<Navigate to={home} replace />} />
       </Routes>
     </>
   );

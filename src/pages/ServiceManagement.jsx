@@ -1,31 +1,40 @@
 // OWNER: Celestin
-// Create and edit services, with the validation the assignment requires.
+//
+// Create and edit services.
+//
+// The form checks the same four rules the server checks. When the server
+// refuses anyway, its message is shown above the form: that is the one that
+// counts, and seeing it is how we know the two agree.
 
-import { useState } from 'react';
-import StatusBadge from '../components/StatusBadge';
-import { PRIORITIES } from '../data/mockData';
-import { isRequired, maxLength, isPositiveNumber, firstError } from '../utils/validation';
+import { useCallback, useEffect, useState } from 'react';
+
+import { getServices, createService, updateService, setServiceOpen } from '../api/client';
+import { isRequired, maxLength, isPositiveNumber, isOneOf, collectErrors } from '../utils/validation';
 
 const NAME_MAX = 100;
+const PRIORITIES = ['low', 'medium', 'high'];
+
 const BLANK = { name: '', description: '', expectedDuration: '', priority: 'medium' };
 
-export default function ServiceManagement({ services, setServices, setEntries }) {
+export default function ServiceManagement({ account }) {
+  const [services, setServices] = useState([]);
+  const [editingId, setEditingId] = useState(null);   // null means creating
   const [form, setForm] = useState(BLANK);
-  const [editingId, setEditingId] = useState(null);
   const [errors, setErrors] = useState({});
-  const [saved, setSaved] = useState('');
+  const [serverError, setServerError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  const update = (field) => (event) => {
-    setForm({ ...form, [field]: event.target.value });
-    if (errors[field]) setErrors({ ...errors, [field]: undefined });
-    setSaved('');
-  };
+  const load = useCallback(() =>
+    getServices()
+      .then((data) => { setServices(data); setServerError(''); })
+      .catch((e) => setServerError(e.message))
+      .finally(() => setLoading(false)), []);
 
-  const reset = () => {
-    setEditingId(null);
-    setForm(BLANK);
-    setErrors({});
-  };
+  useEffect(() => { load(); }, [load]);
+
+  const update = (field) => (event) => setForm({ ...form, [field]: event.target.value });
 
   const startEdit = (service) => {
     setEditingId(service.id);
@@ -36,90 +45,104 @@ export default function ServiceManagement({ services, setServices, setEntries })
       priority: service.priority,
     });
     setErrors({});
-    setSaved('');
+    setServerError('');
+    setNotice('');
   };
 
-  const remove = (service) => {
-    setServices(services.filter((s) => s.id !== service.id));
-    // Anyone queued for a deleted service loses their place.
-    setEntries((current) => current.filter((e) => e.serviceId !== service.id));
-    if (editingId === service.id) reset();
-    setSaved(`${service.name} deleted.`);
+  const reset = () => {
+    setEditingId(null);
+    setForm(BLANK);
+    setErrors({});
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setServerError('');
+    setNotice('');
 
-    const found = {
-      name: firstError(
-        isRequired(form.name, 'Service name'),
-        maxLength(form.name, NAME_MAX, 'Service name'),
-      ),
+    const found = collectErrors({
+      name: isRequired(form.name, 'Service name') ?? maxLength(form.name, NAME_MAX, 'Service name'),
       description: isRequired(form.description, 'Description'),
-      expectedDuration: isPositiveNumber(form.expectedDuration, 'Duration'),
-    };
+      expectedDuration: isPositiveNumber(form.expectedDuration, 'Expected duration'),
+      priority: isOneOf(form.priority, PRIORITIES, 'Priority'),
+    });
 
-    const real = Object.fromEntries(
-      Object.entries(found).filter(([, message]) => message !== null),
-    );
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
 
-    if (Object.keys(real).length > 0) {
-      setErrors(real);
-      return;
+    const fields = { ...form, expectedDuration: Number(form.expectedDuration) };
+
+    setBusy(true);
+    try {
+      if (editingId) {
+        await updateService(editingId, fields, account.id);
+        setNotice(`Updated ${fields.name}.`);
+      } else {
+        await createService(fields, account.id);
+        setNotice(`Created ${fields.name}.`);
+      }
+      reset();
+      await load();
+    } catch (e) {
+      setServerError(e.message);
+    } finally {
+      setBusy(false);
     }
-
-    const clean = {
-      name: form.name.trim(),
-      description: form.description.trim(),
-      expectedDuration: Number(form.expectedDuration),
-      priority: form.priority,
-    };
-
-    if (editingId) {
-      setServices(services.map((s) => (s.id === editingId ? { ...s, ...clean } : s)));
-      setSaved(`${clean.name} updated.`);
-    } else {
-      setServices([...services, { ...clean, id: `s${Date.now()}`, isOpen: true }]);
-      setSaved(`${clean.name} created.`);
-    }
-
-    reset();
   };
+
+  const handleToggle = async (service) => {
+    try {
+      await setServiceOpen(service.id, !service.isOpen, account.id);
+      await load();
+    } catch (e) {
+      setServerError(e.message);
+    }
+  };
+
+  if (loading) return <div className="shell"><p className="muted">Loading…</p></div>;
 
   return (
     <div className="shell">
       <div className="page-head">
         <div>
           <h1>Services</h1>
-          <p>Define what people can queue for, and how long each visit usually takes.</p>
+          <p>{services.length} set up. Changes take effect for students straight away.</p>
         </div>
       </div>
 
+      {serverError && <p className="error" role="alert">{serverError}</p>}
+      {notice && <p className="muted" role="status">{notice}</p>}
+
       <div className="split">
         <section className="stack">
-          {services.length === 0 ? (
-            <div className="empty">No services yet. Create one using the form.</div>
-          ) : (
-            services.map((service) => (
-              <article className="card" key={service.id}>
-                <div className="card-head">
-                  <h3>{service.name}</h3>
-                  <StatusBadge value={service.priority} />
+          {services.map((service) => (
+            <article key={service.id} className="card">
+              <div className="card-head">
+                <h3>{service.name}</h3>
+                <span className={`badge badge-${service.priority}`}>{service.priority}</span>
+              </div>
+
+              <p className="muted">{service.description}</p>
+              <p className="faint">
+                {service.expectedDuration} min per visit · {service.waiting} waiting
+              </p>
+
+              <div className="card-head" style={{ marginBottom: 0 }}>
+                <span className={`badge ${service.isOpen ? 'badge-open' : 'badge-closed'}`}>
+                  {service.isOpen ? 'Open' : 'Closed'}
+                </span>
+                <div className="btn-row">
+                  <button type="button" onClick={() => startEdit(service)}>Edit</button>
+                  <button type="button" onClick={() => handleToggle(service)}>
+                    {service.isOpen ? 'Close' : 'Open'}
+                  </button>
                 </div>
-                <p className="muted" style={{ margin: '.2rem 0 .6rem' }}>
-                  {service.description}
-                </p>
-                <div className="card-head" style={{ marginBottom: 0 }}>
-                  <span className="faint">{service.expectedDuration} min per visit</span>
-                  <div className="btn-row">
-                    <button type="button" onClick={() => startEdit(service)}>Edit</button>
-                    <button type="button" className="btn-danger" onClick={() => remove(service)}>
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))
+              </div>
+            </article>
+          ))}
+
+          {services.length === 0 && (
+            <div className="empty"><p>No services yet. Add the first one.</p></div>
           )}
         </section>
 
@@ -128,65 +151,58 @@ export default function ServiceManagement({ services, setServices, setEntries })
             <h2>{editingId ? 'Edit service' : 'New service'}</h2>
 
             <div className="field">
-              <label htmlFor="svc-name">Service name</label>
+              <label htmlFor="name">Name</label>
               <input
-                id="svc-name"
-                type="text"
+                id="name"
                 value={form.name}
                 onChange={update('name')}
-                aria-invalid={Boolean(errors.name)}
+                aria-invalid={errors.name ? 'true' : undefined}
               />
               {errors.name
                 ? <span className="error">{errors.name}</span>
-                : <span className="hint">{form.name.length}/{NAME_MAX} characters</span>}
+                : <span className="hint">{NAME_MAX} characters or fewer.</span>}
             </div>
 
             <div className="field">
-              <label htmlFor="svc-desc">Description</label>
+              <label htmlFor="description">Description</label>
               <textarea
-                id="svc-desc"
+                id="description"
                 value={form.description}
                 onChange={update('description')}
-                aria-invalid={Boolean(errors.description)}
+                aria-invalid={errors.description ? 'true' : undefined}
               />
               {errors.description && <span className="error">{errors.description}</span>}
             </div>
 
             <div className="field">
-              <label htmlFor="svc-duration">Expected duration (minutes)</label>
+              <label htmlFor="expectedDuration">Expected duration (minutes)</label>
               <input
-                id="svc-duration"
-                type="number"
-                min="1"
-                step="1"
+                id="expectedDuration"
+                inputMode="numeric"
                 value={form.expectedDuration}
                 onChange={update('expectedDuration')}
-                aria-invalid={Boolean(errors.expectedDuration)}
+                aria-invalid={errors.expectedDuration ? 'true' : undefined}
               />
-              {errors.expectedDuration && (
-                <span className="error">{errors.expectedDuration}</span>
-              )}
+              {errors.expectedDuration
+                ? <span className="error">{errors.expectedDuration}</span>
+                : <span className="hint">Used to estimate everyone's wait.</span>}
             </div>
 
             <div className="field">
-              <label htmlFor="svc-priority">Priority level</label>
-              <select id="svc-priority" value={form.priority} onChange={update('priority')}>
-                {PRIORITIES.map((level) => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
+              <label htmlFor="priority">Priority</label>
+              <select id="priority" value={form.priority} onChange={update('priority')}>
+                {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
             </div>
 
             <div className="btn-row">
-              <button type="submit" className="btn-primary">
-                {editingId ? 'Save changes' : 'Create service'}
+              <button type="submit" className="btn-primary" disabled={busy}>
+                {busy ? 'Saving…' : editingId ? 'Save changes' : 'Create service'}
               </button>
               {editingId && (
                 <button type="button" className="btn-quiet" onClick={reset}>Cancel</button>
               )}
             </div>
-
-            {saved && <p className="hint" style={{ marginTop: '.8rem' }}>{saved}</p>}
           </form>
         </aside>
       </div>
