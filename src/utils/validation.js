@@ -49,3 +49,7 @@ export function matches(value, other, label = 'Passwords') {
 export function firstError(...checks) {
   return checks.find((c) => c !== null) ?? null;
 }
+/** Drops the keys whose value is null, leaving only real errors. */
+export function collectErrors(candidate) {
+  return Object.fromEntries(Object.entries(candidate).filter(([, message]) => message));
+}
