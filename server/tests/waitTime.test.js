@@ -1,24 +1,35 @@
 // OWNER: Valeriia
-//
-// Tests for waitTime.js — estimateWait, formatWait
-//
-// See store.test.js for a worked example. The shape of a test is always:
-// set up some data, call the function, check the result.
-//
-// The beforeEach below is REQUIRED. Our data lives in memory, so without it
-// one test's changes leak into the next and you get tests that pass alone but
-// fail when run together.
-//
-// The list of tests to write for this module is in the A3 task document.
 
 import { describe, test, expect, beforeEach } from 'vitest';
 import { resetStore } from '../data/store.js';
-// import { ... } from '../modules/waitTime.js';
+import { estimateWait, formatWait } from '../modules/waitTime.js';
 
 beforeEach(() => {
   resetStore();
 });
 
 describe('waitTime', () => {
-  test.todo('write the tests listed in the task document');
+  test('calculates estimated wait using service duration', () => {
+    expect(estimateWait(3, 's1')).toBe(60);
+  });
+
+  test('returns zero for an unknown service', () => {
+    expect(estimateWait(3, 'unknown')).toBe(0);
+  });
+
+  test('formats zero minutes as Next up', () => {
+    expect(formatWait(0)).toBe('Next up');
+  });
+
+  test('formats minutes under one hour', () => {
+    expect(formatWait(20)).toBe('20 min');
+  });
+
+  test('formats whole hours', () => {
+    expect(formatWait(60)).toBe('1 hr');
+  });
+
+  test('formats hours and remaining minutes', () => {
+    expect(formatWait(75)).toBe('1 hr 15 min');
+  });
 });

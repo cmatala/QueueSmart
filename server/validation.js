@@ -1,4 +1,4 @@
-// OWNER: Celestin — shared file, say something in the group chat before changing it.
+// OWNER: Celestin - shared file, say something in the group chat before changing it.
 //
 // Server-side validation. These are the same checks as the front end's
 // src/utils/validation.js, with the same wording, so a user sees the same

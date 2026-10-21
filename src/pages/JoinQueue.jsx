@@ -1,35 +1,16 @@
 // OWNER: Megan
-// TODO: see the A2 plan for what this screen must do.
 // Pick a service, see the estimated wait, join or leave.
+// Everything comes from the API: GET /api/services, POST join, DELETE entry.
 
-import { useState } from 'react';
 import ServiceCard from '../components/ServiceCard';
-import { getQueue } from '../data/mockData';
-import { joinQueue, leaveQueue, positionIn } from '../utils/queueActions';
+import useQueueData from '../utils/useQueueData';
 
-export default function JoinQueue({ services, entries, setEntries }) {
-  const [message, setMessage] = useState('');
+// TODO: remove this fallback once App.jsx passes the signed-in user as `user`.
+const TEMP_USER_ID = 'u2';
 
-  const canUpdate = () => {
-    if (typeof setEntries !== 'function') {
-      console.error('JoinQueue: setEntries was not passed in. Check the route in App.jsx.');
-      setMessage('Could not update the queue: App.jsx is not passing setEntries to this page.');
-      return false;
-    }
-    return true;
-  };
-
-  const handleJoin = (service) => {
-    if (!canUpdate()) return;
-    setEntries(joinQueue(entries, service));
-    setMessage(`You joined ${service.name}.`);
-  };
-
-  const handleLeave = (service) => {
-    if (!canUpdate()) return;
-    setEntries(leaveQueue(entries, service.id));
-    setMessage(`You left ${service.name}.`);
-  };
+export default function JoinQueue({ user }) {
+  const userId = user?.id ?? TEMP_USER_ID;
+  const { services, loading, error, notice, reload, join, leave, positionIn } = useQueueData(userId);
 
   return (
     <div className="shell">
@@ -40,25 +21,35 @@ export default function JoinQueue({ services, entries, setEntries }) {
         </div>
       </div>
 
-      {message && <p className="hint" role="status">{message}</p>}
+      {notice && (
+        <p className="hint" role={notice.isError ? 'alert' : 'status'}>
+          {notice.text}
+        </p>
+      )}
 
-      {services.length === 0 ? (
+      {loading ? (
+        <div className="empty">Loading services...</div>
+      ) : error ? (
+        <div className="empty" role="alert">
+          <p style={{ margin: '0 0 .8rem' }}>{error}</p>
+          <button type="button" className="btn-primary" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      ) : services.length === 0 ? (
         <div className="empty">No services are available right now.</div>
       ) : (
         <div className="stack">
-          {services.map((service) => {
-            const queue = getQueue(entries, service.id);
-            return (
-              <ServiceCard
-                key={service.id}
-                service={service}
-                waiting={queue.length}
-                position={positionIn(queue)}
-                onJoin={handleJoin}
-                onLeave={handleLeave}
-              />
-            );
-          })}
+          {services.map((service) => (
+            <ServiceCard
+              key={service.id}
+              service={service}
+              waiting={service.waiting}
+              position={positionIn(service)}
+              onJoin={join}
+              onLeave={leave}
+            />
+          ))}
         </div>
       )}
     </div>

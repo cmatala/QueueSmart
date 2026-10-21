@@ -1,4 +1,4 @@
-// OWNER: Celestin — shared file, say something in the group chat before changing it.
+// OWNER: Celestin - shared file, say something in the group chat before changing it.
 //
 // All QueueSmart data lives here. A3 needs no database, so this is plain
 // JavaScript arrays held in memory. Every module reads and writes through this

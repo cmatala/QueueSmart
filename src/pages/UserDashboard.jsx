@@ -1,94 +1,76 @@
 // OWNER: Megan
-// TODO: see the A2 plan for what this screen must do.
 // Current queue position first, then joinable services and notifications.
+// Everything comes from the API; no numbers are worked out on this screen.
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ServiceCard from '../components/ServiceCard';
 import Notification from '../components/Notification';
 import StatusBadge from '../components/StatusBadge';
-import {
-  CURRENT_USER_ID,
-  notifications,
-  getUser,
-  getQueue,
-  formatWait,
-} from '../data/mockData';
-import { joinQueue, leaveQueue, positionIn } from '../utils/queueActions';
+import useQueueData from '../utils/useQueueData';
+import { getNotifications } from '../utils/servicesApi';
+import { formatWait } from '../utils/formatWait';
 
-const ordinal = (n) => {
-  const rest = n % 100;
-  if (rest >= 11 && rest <= 13) return `${n}th`;
-  return `${n}${{ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] ?? 'th'}`;
-};
+// TODO: remove this fallback once App.jsx passes the signed-in user as `user`.
+const TEMP_USER_ID = 'u2';
 
-const timeNow = () => new Date().toTimeString().slice(0, 5);
-
-export default function UserDashboard({ services, entries, setEntries }) {
+export default function UserDashboard({ user }) {
   const navigate = useNavigate();
-  const [message, setMessage] = useState('');
-  const [events, setEvents] = useState([]); // notifications created this session
-
-  const user = getUser(CURRENT_USER_ID);
+  const userId = user?.id ?? TEMP_USER_ID;
   const firstName = user?.name?.split(' ')[0] ?? 'there';
 
-  // Services the user is currently waiting in
-  const mine = services
-    .map((service) => {
-      const queue = getQueue(entries, service.id);
-      return { service, queue, position: positionIn(queue) };
-    })
-    .filter((item) => item.position > 0);
+  const { services, status, loading, error, notice, reload, join, leave, positionIn } =
+    useQueueData(userId);
 
-  const current = mine[0]; // highlight the first one
+  const [notifications, setNotifications] = useState([]);
+  const [notifError, setNotifError] = useState('');
 
-  // Notifications: live position updates, then this session's events,
-  // then saved ones (skipping old "moved up" notes, which would be out of date).
-  const livePosition = mine.map(({ service, position }) => ({
-    id: `live-${service.id}`,
-    message:
-      position === 1
-        ? `You are next in ${service.name}.`
-        : `You are ${ordinal(position)} in line for ${service.name}, about ${formatWait(
-            (position - 1) * service.expectedDuration,
-          )}.`,
-    time: 'Now',
-    unread: true,
-  }));
-  const saved = notifications.filter(
-    (n) => n.userId === CURRENT_USER_ID && !/moved up/i.test(n.message),
-  );
-  const allNotifications = [...livePosition, ...events, ...saved];
-
-  const addEvent = (text) =>
-    setEvents((prev) => [
-      { id: `ev${Date.now()}`, message: text, time: timeNow(), unread: true },
-      ...prev,
-    ]);
-
-  const canUpdate = () => {
-    if (typeof setEntries !== 'function') {
-      console.error('UserDashboard: setEntries was not passed in. Check the route in App.jsx.');
-      setMessage('Could not update the queue: App.jsx is not passing setEntries to this page.');
-      return false;
+  const loadNotifications = useCallback(async () => {
+    try {
+      setNotifications(await getNotifications(userId));
+      setNotifError('');
+    } catch (err) {
+      setNotifError(err.message);
     }
-    return true;
+  }, [userId]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  // Joining creates a notification on the server, so fetch the list again.
+  const handleJoin = async (service) => {
+    await join(service);
+    loadNotifications();
+  };
+  const handleLeave = async (service) => {
+    await leave(service);
+    loadNotifications();
   };
 
-  const handleJoin = (service) => {
-    if (!canUpdate()) return;
-    const place = getQueue(entries, service.id).length + 1;
-    setEntries(joinQueue(entries, service));
-    setMessage(`You joined ${service.name}.`);
-    addEvent(`You joined ${service.name} at position ${place}.`);
-  };
+  if (loading) {
+    return (
+      <div className="shell">
+        <div className="empty">Loading your dashboard...</div>
+      </div>
+    );
+  }
 
-  const handleLeave = (service) => {
-    if (!canUpdate()) return;
-    setEntries(leaveQueue(entries, service.id));
-    setMessage(`You left ${service.name}.`);
-    addEvent(`You left ${service.name}.`);
-  };
+  if (error) {
+    return (
+      <div className="shell">
+        <div className="empty" role="alert">
+          <p style={{ margin: '0 0 .8rem' }}>{error}</p>
+          <button type="button" className="btn-primary" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // The service the user is waiting in, with the server's own numbers.
+  const currentService = status ? services.find((s) => s.name === status.service) : null;
 
   return (
     <div className="shell">
@@ -99,19 +81,18 @@ export default function UserDashboard({ services, entries, setEntries }) {
         </div>
       </div>
 
-      {current ? (
+      {status ? (
         <div className="card card-hilite">
           <div className="card-head">
-            <h2>{current.service.name}</h2>
-            <StatusBadge status={current.position === 1 ? 'almost ready' : 'waiting'} />
+            <h2>{status.service}</h2>
+            <StatusBadge status={status.status} />
           </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.2 }}>
-            Position {current.position} of {current.queue.length}
+            Position {status.position}
+            {currentService ? ` of ${currentService.waiting}` : ''}
           </div>
           <p className="muted" style={{ margin: '.3rem 0 .8rem' }}>
-            {current.position === 1
-              ? 'You are next'
-              : `about ${formatWait((current.position - 1) * current.service.expectedDuration)}`}
+            {status.position === 1 ? 'You are next' : `about ${formatWait(status.wait)}`}
           </p>
           <button type="button" className="btn-primary" onClick={() => navigate('/status')}>
             View status
@@ -127,29 +108,32 @@ export default function UserDashboard({ services, entries, setEntries }) {
       )}
 
       <h2 style={{ marginTop: '2rem' }}>Services you can join</h2>
-      {message && <p className="hint" role="status">{message}</p>}
+      {notice && (
+        <p className="hint" role={notice.isError ? 'alert' : 'status'}>
+          {notice.text}
+        </p>
+      )}
       <div className="grid">
-        {services.map((service) => {
-          const queue = getQueue(entries, service.id);
-          return (
-            <ServiceCard
-              key={service.id}
-              service={service}
-              waiting={queue.length}
-              position={positionIn(queue)}
-              onJoin={handleJoin}
-              onLeave={handleLeave}
-            />
-          );
-        })}
+        {services.map((service) => (
+          <ServiceCard
+            key={service.id}
+            service={service}
+            waiting={service.waiting}
+            position={positionIn(service)}
+            onJoin={handleJoin}
+            onLeave={handleLeave}
+          />
+        ))}
       </div>
 
       <h2 style={{ marginTop: '2rem' }}>Notifications</h2>
-      {allNotifications.length === 0 ? (
+      {notifError ? (
+        <div className="empty" role="alert">{notifError}</div>
+      ) : notifications.length === 0 ? (
         <div className="empty">No notifications yet.</div>
       ) : (
         <div className="stack">
-          {allNotifications.map((n) => (
+          {notifications.map((n) => (
             <Notification key={n.id} message={n.message} time={n.time} unread={n.unread} />
           ))}
         </div>

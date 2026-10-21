@@ -5,7 +5,7 @@
 // Every function returns ok(data) on success or fail(message, status) on
 // failure. Import those from ../validation.js.
 //
-// TODO Celeste — implement:
+// TODO Celeste - implement:
 //
 //   registerUser({ name, email, password })
 //     Rejects: missing name, invalid email, password under 8 characters,
