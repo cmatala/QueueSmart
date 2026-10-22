@@ -1,181 +1,137 @@
 // OWNER: Valeriia
 
-import { useEffect, useState } from 'react'
-import {
-  CURRENT_USER_ID,
-  notifications,
-} from '../data/mockData'
-import {
-  getQueue,
-  leaveQueue as leaveQueueRequest,
-  getServices,
-  getNotifications,
-} from '../api/client'
-import StatusBadge from '../components/StatusBadge'
-import Notification from '../components/Notification'
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { getUserStatus, getQueue, leaveQueue } from '../api/client';
+import { formatWait } from '../utils/formatWait';
+import StatusBadge from '../components/StatusBadge';
 
-export default function QueueStatus(){
-  const [queue, setQueue] = useState([])
-  const [service, setService] = useState(null)
-  const [userNotifications, setUserNotifications] = useState(notifications.filter(
-    (notification) => notification.userId === CURRENT_USER_ID
-  ))
-  const [inQueue, setInQueue] = useState(true)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+export default function QueueStatus({ account }){
+  const navigate = useNavigate();
 
+  const [status, setStatus] = useState(null);
+  const [queue, setQueue] = useState([]);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [leaving, setLeaving] = useState(false);
 
-  useEffect(() => {
-    async function loadData(){
-      try{
-        const servicesData = await getServices()
-
-        const queueData = await Promise.all(
-          servicesData.map((item) => getQueue(item.id))
-        )
-
-        const userQueueIndex = queueData.findIndex((entries) =>
-          entries.some((entry) => entry.userId === CURRENT_USER_ID)
-        )
-
-        if(userQueueIndex !== -1){
-          setQueue(queueData[userQueueIndex])
-          setService(servicesData[userQueueIndex])
-          setInQueue(true)
-        }else{
-          setQueue([])
-          setService(null)
-          setInQueue(false)
-        }
-
-        try{
-          const notificationData = await getNotifications(CURRENT_USER_ID)
-          setUserNotifications(notificationData)
-        }catch{
-          // Keep the existing mock notifications if this endpoint is unavailable.
-        }
-
-        setError('')
-      }catch(err){
-        setError(err.message)
-      }finally{
-        setLoading(false)
-      }
-    }
-
-    loadData()
-  }, [])
-
-  async function handleLeaveQueue(){
-    const currentEntry = queue.find(
-      (entry) => entry.userId === CURRENT_USER_ID
-    )
-
-    if(!currentEntry) return
-
+  const load = useCallback(async()=>{
     try{
-      await leaveQueueRequest(currentEntry.id)
-      setQueue((previousQueue) =>
-        previousQueue.filter((entry) => entry.id !== currentEntry.id)
-      )
-      setInQueue(false)
-      setError('')
-    }catch(err){
-      setError(err.message)
+      const statusData = await getUserStatus(account.id);
+      setStatus(statusData);
+      setQueue(statusData ? await getQueue(statusData.serviceId) : []);
+      setError('');
     }
-  }
+    catch(e){
+      setError(e.message);
+    }
+    finally{
+      setLoading(false);
+    }
+  }, [account.id]);
 
-  if(loading){
+  useEffect(()=>{ load(); }, [load]);
+
+  const handleLeave = async()=>{
+    if(!status) return;
+    setLeaving(true);
+    try{
+      await leaveQueue(status.entryId);
+      navigate('/dashboard');
+    }
+    catch(e){
+      setError(e.message);
+      setLeaving(false);
+    }
+  };
+
+  if(loading) return <div className="shell"><p className="muted">Loading…</p></div>;
+
+  if(error){
     return(
       <div className="shell">
-        <h1>Your queue status</h1>
-        <p>Loading your queue...</p>
-      </div>
-    )
-  }
-
-  if(error && queue.length === 0){
-    return(
-      <div className="shell">
-        <h1>Your queue status</h1>
-        <p role="alert">{error}</p>
-      </div>
-    )
-  }
-
-  const currentEntry = queue.find(
-    (entry) => entry.userId === CURRENT_USER_ID
-  )
-
-  if(!currentEntry || !inQueue){
-    return(
-      <div className="shell">
-        <h1>Your queue status</h1>
-        {error && <p role="alert">{error}</p>}
         <div className="empty">
-          You are not currently in a queue.
+          <p role="alert">{error}</p>
+          <button type="button" onClick={load}>Try again</button>
         </div>
       </div>
-    )
+    );
   }
 
-  const position = currentEntry.position
-  const wait = currentEntry.wait
-  const positionLabel =
-    position === 1
-      ? '1st'
-      : position === 2
-        ? '2nd'
-        : position === 3
-          ? '3rd'
-          : `${position}th`
+  if(!status){
+    return(
+      <div className="shell">
+        <div className="page-head"><h1>Queue status</h1></div>
+        <div className="empty">
+          <p>You are not in a queue.</p>
+          <button type="button" className="btn-primary" onClick={()=>navigate('/join')}>
+            Join one
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return(
     <div className="shell">
       <div className="page-head">
         <div>
-          <h1>Your queue status</h1>
-          <p>{service?.name || 'Your service'}</p>
+          <h1>{status.service}</h1>
+          <p>
+            You are number {status.position} of {queue.length}.
+          </p>
+        </div>
+        <div className="btn-row">
+          <button type="button" onClick={load}>Refresh</button>
+          <button type="button" className="btn-danger" onClick={handleLeave} disabled={leaving}>
+            {leaving ? 'Leaving…' : 'Leave queue'}
+          </button>
         </div>
       </div>
 
-      {error && <p role="alert">{error}</p>}
-
-      <div className="card card-hilite">
-        <div className="card-head">
-          <div>
-            <p className="hint">Your position</p>
-            <h2>{positionLabel} in line</h2>
+      <div className="split">
+        <section className="stack">
+          <h2>Everyone waiting</h2>
+          <div className="queue-list">
+            {queue.map((entry)=>(
+              <div
+                key={entry.id}
+                className={`queue-row${entry.position === 1 ? ' is-next' : ''}`}
+              >
+                <span className="pos">{entry.position}</span>
+                <div>
+                  <div className="row-name">
+                    {entry.userId === account.id ? 'You' : entry.userName}
+                  </div>
+                  <div className="faint">joined {entry.joinedAt}</div>
+                </div>
+                <span className="badge badge-waiting">{formatWait(entry.wait)}</span>
+              </div>
+            ))}
           </div>
+        </section>
 
-          <StatusBadge status={currentEntry.status || 'waiting'} />
-        </div>
-
-        <p>
-          Estimated wait: {wait === 0 ? 'Next up' : `about ${wait} minutes`}
-        </p>
-
-        <p className="hint">
-          Joined at {currentEntry.joinedAt} · {currentEntry.priority} priority
-        </p>
-
-        <button className="btn-danger" onClick={handleLeaveQueue}>
-          Leave queue
-        </button>
-      </div>
-
-      <div className="stack">
-        <h2 style={{ marginTop: '20px' }}>Updates</h2>
-
-        {userNotifications.map((notification) => (
-          <Notification
-            key={notification.id}
-            message={notification.message}
-            time={notification.time}
-            unread={notification.unread}
-          />
-        ))}
+        <aside>
+          <section className="card">
+            <div className="card-head">
+              <h2>Your wait</h2>
+              <StatusBadge status={status.status} />
+            </div>
+            <p style={{ fontSize: '2rem', fontWeight: 700, margin: '0 0 .25rem' }}>
+              {formatWait(status.wait)}
+            </p>
+            <p className="faint">
+              {status.status === 'almost ready'
+                ? 'You are next. Please make your way over.'
+                : `${status.position - 1} ahead of you.`}
+            </p>
+            <p className="hint">
+              Estimated from the number of people ahead and how long this
+              service usually takes. It is a guide, not a promise.
+            </p>
+          </section>
+        </aside>
       </div>
     </div>
-  )
+  );
 }
