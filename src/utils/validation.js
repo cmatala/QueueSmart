@@ -37,8 +37,8 @@ export function isPositiveNumber(value, label = 'This field') {
   return null;
 }
 
-export function matches(value, other, label = 'Passwords') {
-  return value === other ? null : `${label} do not match.`;
+export function isOneOf(value, allowed, label = 'This field') {
+  return allowed.includes(value) ? null : `${label} must be one of: ${allowed.join(', ')}.`;
 }
 
 /** leaves the actual errors only */
