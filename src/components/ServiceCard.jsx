@@ -1,45 +1,33 @@
 // OWNER: Megan
-// Shared component: one service; used on Join Queue and Admin Dashboard
-// TODO: see the A2 plan.
-// One service on the Join Queue and Dashboard screens.
-// Props: service, waiting (count), position (0 = not joined), onJoin, onLeave.
-// Closed services get a "Closed" label instead of a disabled button.
+//
+// One service, used on Join Queue and the Admin Dashboard.
+//
+// The waiting count now arrives on the service itself, as `waiting`, because
+// the server works it out in listServices. The screens no longer count
+// queue entries themselves, which is what used to let two screens disagree.
 
-import StatusBadge from './StatusBadge';
-import { formatWait } from '../data/mockData';
-
-export default function ServiceCard({ service, waiting, position, onJoin, onLeave }) {
-  const joined = position > 0;
-  const waitIfJoin = formatWait(waiting * service.expectedDuration);
-
-  let detail;
-  if (!service.isOpen) detail = 'Queue closed';
-  else if (joined) detail = `${waiting} waiting · you are in this queue at position ${position}`;
-  else detail = `${waiting} waiting · about ${waitIfJoin} if you join now`;
-
+export default function ServiceCard({ service, waitLabel, actions }) {
   return (
     <article className="card">
       <div className="card-head">
-        <div>
-          <h3>{service.name}</h3>
-          <span className="faint">{service.expectedDuration} min per visit</span>
-        </div>
-        <StatusBadge status={service.isOpen ? 'open' : 'closed'} />
+        <h3>{service.name}</h3>
+        <span className={`badge badge-${service.priority}`}>{service.priority}</span>
       </div>
 
-      <p className="muted" style={{ margin: '0 0 .8rem' }}>{detail}</p>
+      <p className="muted">{service.description}</p>
 
-      {!service.isOpen ? (
-        <span className="faint">Closed</span>
-      ) : joined ? (
-        <button type="button" className="btn-danger" onClick={() => onLeave(service)}>
-          Leave
-        </button>
-      ) : (
-        <button type="button" className="btn-primary" onClick={() => onJoin(service)}>
-          Join
-        </button>
-      )}
+      <p className="faint">
+        {service.expectedDuration} min per visit
+        {typeof service.waiting === 'number' && ` · ${service.waiting} waiting`}
+        {waitLabel && ` · about ${waitLabel}`}
+      </p>
+
+      <div className="card-head" style={{ marginBottom: 0 }}>
+        <span className={`badge ${service.isOpen ? 'badge-open' : 'badge-closed'}`}>
+          {service.isOpen ? 'Open' : 'Closed'}
+        </span>
+        {actions}
+      </div>
     </article>
   );
 }
