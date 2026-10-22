@@ -4,7 +4,7 @@ in browser */
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { users } from '../api/client';
+import { register } from '../api/client';
 import { isRequired, isValidEmail, minLength, collectErrors } from '../utils/validation';
 
 const PASSWORD_MIN = 8;
