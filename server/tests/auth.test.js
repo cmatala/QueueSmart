@@ -3,7 +3,7 @@
 // Tests for auth.js: registerUser, loginUser, requireAdmin
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { resetStore } from '../data/store.js';
+import { store, resetStore } from '../data/store.js';
 import { registerUser, loginUser, requireAdmin } from '../modules/auth.js';
 
 beforeEach(() => {
