@@ -1,59 +1,59 @@
 // OWNER: Celeste
-// Validates email and password and takes user to correct dashboard
+// Validates email and password and takes user to correct dashboard based off the server now
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { users } from '../data/mockData';
-import { isValidEmail, isRequired } from '../utils/validation';
+import { users } from '../api/client';
+import { isValidEmail, isRequired, collectErrors } from '../utils/validation';
 
 
 export default function Login({ onSignIn }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   // update a field and clear its error if any as the user types
   const update = (field) => (event) => {
     setForm({ ...form, [field]: event.target.value });
-    if (errors[field]) setErrors({ ...errors, [field]: undefined });
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault(); // stop the browser from reloading the page
+    setServerError('');
 
-    const found = {
+    const found = collectErrors({
       email: isValidEmail(form.email),
       password: isRequired(form.password, 'Password'),
-    };
+    });
 
     // keep the fields that failed
     const real = Object.fromEntries(
       Object.entries(found).filter(([, message]) => message !== null),
     );
 
-    if (Object.keys(real).length > 0) {
-      setErrors(real);
-      return;
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    setBusy(true);
+    try {
+      const account = await login(form);
+      onSignIn(account);
+      navigate(account.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+    } catch (error) {
+      setServerError(error.message);
+    } finally {
+      setBusy(false);
     }
-
-    // look up email in mockdata.js for now
-    const account = users.find(
-      (u) => u.email.toLowerCase() === form.email.trim().toLowerCase(),
-    );
-
-    if (!account) {
-      setErrors({ email: 'No account found with that email.' });
-      return;
-    }
-
-    onSignIn(account);
-    navigate(account.role === 'admin' ? '/admin' : '/dashboard');
   };
 
   return (
     <div className="shell">
       <form className="card form-card" onSubmit={handleSubmit} noValidate>
-        <h1>Sign in to QueueSmart</h1>
+        <h1>Sign in</h1>
+
+        {serverError && <p className="error" role="alert">{serverError}</p>}
 
         <div className="field">
           <label htmlFor="email">Email</label>
@@ -62,12 +62,10 @@ export default function Login({ onSignIn }) {
             type="email"
             value={form.email}
             onChange={update('email')}
-            aria-invalid={Boolean(errors.email)}
-            aria-describedby={errors.email ? 'email-error' : undefined}
+            aria-invalid={errors.email ? 'true' : undefined}
+            autoComplete="username"
           />
-          {errors.email && (
-            <span className="error" id="email-error">{errors.email}</span>
-          )}
+          {errors.email && <span className="error">{errors.email}</span>}
         </div>
 
         <div className="field">
@@ -77,28 +75,19 @@ export default function Login({ onSignIn }) {
             type="password"
             value={form.password}
             onChange={update('password')}
-            aria-invalid={Boolean(errors.password)}
-            aria-describedby={errors.password ? 'password-error' : undefined}
+            aria-invalid={errors.password ? 'true' : undefined}
+            autoComplete="current-password"
           />
-          {errors.password && (
-            <span className="error" id="password-error">{errors.password}</span>
-          )}
+          {errors.password && <span className="error">{errors.password}</span>}
         </div>
 
-        <button type="submit" className="btn-primary" style={{ width: '100%' }}>
-          Sign in
+        <button type="submit" className="btn-primary" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <p className="faint" style={{ marginTop: '1rem', marginBottom: '.5rem' }}>
-          No account? <Link to="/register">Register</Link>
+        <p className="hint" style={{ marginTop: '1rem' }}>
+          No account yet? <Link to="/register">Create one</Link>.
         </p>
-
-        <div className="empty" style={{ padding: '.7rem', textAlign: 'left' }}>
-          <strong className="faint">Demo accounts</strong>
-          <div className="faint">User: alex@queuesmart.edu</div>
-          <div className="faint">Admin: admin@queuesmart.edu</div>
-          <div className="faint">Any password works - there is no backend yet.</div>
-        </div>
       </form>
     </div>
   );

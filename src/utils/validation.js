@@ -1,10 +1,7 @@
 // OWNER: Celeste
 //
-// The checks every form reuses. Each returns an error message string,
-// or null when the value is fine - so a screen can do:
-//
-//   const error = isValidEmail(email);
-//   if (error) setErrors({ ...errors, email: error });
+/*This page checks whether or not a password fulfills the requirements needed to make one. These
+checks are the same as server/validation.js checks but is done in browser for efficiency*/
 
 export function isRequired(value, label = 'This field') {
   if (value === null || value === undefined) return `${label} is required.`;
@@ -15,7 +12,6 @@ export function isRequired(value, label = 'This field') {
 export function isValidEmail(value) {
   const empty = isRequired(value, 'Email');
   if (empty) return empty;
-  // Deliberately simple: something, @, something, dot, something.
   const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
   return looksLikeEmail ? null : 'Enter a valid email address.';
 }
@@ -45,11 +41,7 @@ export function matches(value, other, label = 'Passwords') {
   return value === other ? null : `${label} do not match.`;
 }
 
-// Runs several checks and returns the first error, or null.
-export function firstError(...checks) {
-  return checks.find((c) => c !== null) ?? null;
-}
-/** Drops the keys whose value is null, leaving only real errors. */
+/** leaves the actual errors only */
 export function collectErrors(candidate) {
   return Object.fromEntries(Object.entries(candidate).filter(([, message]) => message));
 }
