@@ -1,30 +1,29 @@
 // OWNER: Celestin
 //
-// Queue participation history. A visit is recorded when someone is served,
-// leaves, or is marked a no-show.
+// Queue participation history, now stored in the History table.
 //
-// addHistoryEntry is called by the queue module as a side effect, the same
-// way notifications are.
+// A visit is recorded when someone is served, leaves, or is marked a no-show.
+// addHistoryEntry is called by the queue module as a side effect, the same way
+// notifications are.
 
-import { store, findService, nextId, STATUS } from '../data/store.js';
+import {
+  findService, nextId, insertHistory, historyFor, OUTCOMES,
+} from '../data/store.js';
 import { ok, fail, isRequired, isOneOf, firstError } from '../validation.js';
 
-export const OUTCOMES = [STATUS.SERVED, STATUS.LEFT, STATUS.NO_SHOW];
-
-/** Today as 'YYYY-MM-DD' in local time. */
-function today() {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${month}-${day}`;
-}
+export { OUTCOMES };
 
 /**
  * Records one finished visit.
  *
- * Built from local date parts rather than toISOString(), which converts to
- * UTC and files an evening visit under tomorrow's date for anyone in a
- * negative offset. We hit exactly that bug on the A2 History screen.
+ * The service's name is copied into the row rather than only its id. A past
+ * visit should still say what it was for even if the service is deleted
+ * later, and the schema's ON DELETE SET NULL on service_id is what makes that
+ * necessary.
+ *
+ * The date comes from the database's own date('now','localtime'), which also
+ * settles the A2 bug where toISOString() filed an evening visit under
+ * tomorrow for anyone behind UTC.
  */
 export function addHistoryEntry({ userId, serviceId, outcome, waitedMinutes } = {}) {
   const problem = firstError(
@@ -34,39 +33,33 @@ export function addHistoryEntry({ userId, serviceId, outcome, waitedMinutes } = 
   );
   if (problem) return fail(problem);
 
+  const service = findService(serviceId);
+  if (!service) return fail('Service not found.', 404);
+
   const minutes = Number(waitedMinutes);
 
-  const entry = {
-    id: nextId('h'),
-    userId,
-    serviceId,
-    date: today(),
-    outcome,
-    waitedMinutes: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 0,
-  };
-
-  store.history.unshift(entry);
-  return ok(entry);
+  try {
+    return ok(insertHistory({
+      id: nextId('h'),
+      userId,
+      serviceId,
+      serviceName: service.name,
+      outcome,
+      waitedMinutes: Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes) : 0,
+    }));
+  } catch {
+    // user_id has a foreign key; an unknown user lands here.
+    return fail('Could not record that visit.', 400);
+  }
 }
 
 /**
  * One user's past visits, newest first.
  *
- * The service name is resolved here so the History screen does not have to
- * fetch the service list just to render a row.
+ * Ordering and the service name both come from the query, so this function
+ * only has to hand the rows on.
  */
 export function getHistory(userId) {
-  const mine = store.history
-    .filter((h) => h.userId === userId)
-    .map((h) => ({
-      id: h.id,
-      serviceId: h.serviceId,
-      serviceName: findService(h.serviceId)?.name ?? 'Unknown service',
-      date: h.date,
-      outcome: h.outcome,
-      waitedMinutes: h.waitedMinutes,
-    }))
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  return ok(mine);
+  return ok(historyFor(userId).map(({ id, serviceId, serviceName, date, outcome, waitedMinutes }) =>
+    ({ id, serviceId, serviceName, date, outcome, waitedMinutes })));
 }

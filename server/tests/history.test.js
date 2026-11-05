@@ -3,7 +3,7 @@
 // Tests for history.js — addHistoryEntry, getHistory
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { store, resetStore, STATUS } from '../data/store.js';
+import { db, resetStore } from '../data/store.js';
 import { addHistoryEntry, getHistory } from '../modules/history.js';
 
 beforeEach(() => {
@@ -13,18 +13,20 @@ beforeEach(() => {
 const visit = {
   userId: 'u2',
   serviceId: 's1',
-  outcome: STATUS.SERVED,
+  outcome: 'served',
   waitedMinutes: 18,
 };
 
+const rowCount = () => db.prepare('SELECT COUNT(*) AS n FROM History').get().n;
+
 describe('addHistoryEntry', () => {
-  test('records a visit and puts it at the front', () => {
+  test('writes the visit and returns it', () => {
     const result = addHistoryEntry(visit);
 
     expect(result.ok).toBe(true);
     expect(result.data.waitedMinutes).toBe(18);
-    expect(store.history[0].id).toBe(result.data.id);
-    expect(store.history).toHaveLength(5);
+    expect(result.data.serviceName).toBe('Academic Advising');
+    expect(rowCount()).toBe(5);
   });
 
   test('dates it today in local time, not UTC', () => {
@@ -38,9 +40,19 @@ describe('addHistoryEntry', () => {
     expect(addHistoryEntry(visit).data.date).toBe(expected);
   });
 
+  test('copies the service name in, so it survives the service being deleted', () => {
+    const { data } = addHistoryEntry(visit);
+
+    db.prepare(`DELETE FROM Service WHERE service_id = 's1'`).run();
+
+    const after = db.prepare('SELECT * FROM History WHERE history_id = ?').get(data.id);
+    expect(after.service_id).toBeNull();
+    expect(after.service_name).toBe('Academic Advising');
+  });
+
   test('accepts left and no-show as outcomes', () => {
-    expect(addHistoryEntry({ ...visit, outcome: STATUS.LEFT }).ok).toBe(true);
-    expect(addHistoryEntry({ ...visit, outcome: STATUS.NO_SHOW }).ok).toBe(true);
+    expect(addHistoryEntry({ ...visit, outcome: 'left' }).ok).toBe(true);
+    expect(addHistoryEntry({ ...visit, outcome: 'no-show' }).ok).toBe(true);
   });
 
   test('rejects an outcome that is not one of the three', () => {
@@ -48,11 +60,23 @@ describe('addHistoryEntry', () => {
 
     expect(result.ok).toBe(false);
     expect(result.status).toBe(400);
+    expect(rowCount()).toBe(4);
   });
 
   test('rejects a missing user or service', () => {
     expect(addHistoryEntry({ ...visit, userId: undefined }).ok).toBe(false);
     expect(addHistoryEntry({ ...visit, serviceId: '' }).ok).toBe(false);
+  });
+
+  test('an unknown service returns 404', () => {
+    expect(addHistoryEntry({ ...visit, serviceId: 's99' }).status).toBe(404);
+  });
+
+  test('an unknown user is refused by the foreign key', () => {
+    const result = addHistoryEntry({ ...visit, userId: 'nobody' });
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(400);
   });
 
   test('treats a missing or negative wait as zero', () => {
@@ -69,7 +93,7 @@ describe('getHistory', () => {
     expect(result.data).toHaveLength(4);
   });
 
-  test('resolves the service name for each row', () => {
+  test('names the service on every row', () => {
     const { data } = getHistory('u2');
 
     expect(data[0].serviceName).toBe('Financial Aid');
@@ -92,5 +116,24 @@ describe('getHistory', () => {
 
   test('a user with no visits gets an empty list', () => {
     expect(getHistory('u6').data).toEqual([]);
+  });
+});
+
+describe('persistence', () => {
+  test('a visit written now is still there after reopening the database', async () => {
+    const { data } = addHistoryEntry({ ...visit, serviceId: 's3' });
+
+    // Open a second, independent connection to the same file. This is as
+    // close as a unit test gets to restarting the server, and it is the one
+    // thing A3 could not do at all.
+    const { default: Database } = await import('better-sqlite3');
+    const { DB_PATH } = await import('../db/connection.js');
+    const fresh = new Database(DB_PATH, { readonly: true });
+
+    const row = fresh.prepare('SELECT * FROM History WHERE history_id = ?').get(data.id);
+    fresh.close();
+
+    expect(row).toBeDefined();
+    expect(row.service_name).toBe('ID Card Services');
   });
 });

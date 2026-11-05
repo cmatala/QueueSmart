@@ -1,38 +1,33 @@
 // OWNER: Celestin
 //
-// In-app notifications. A3 requires no real email; a notification is a record
-// in the store that the front end displays.
+// In-app notifications, now stored in the Notification table.
 //
-// notifyJoined and notifyAlmostReady are called by the queue module, not
-// exposed as endpoints. They are side effects: the queue calls them and
-// ignores the result, so a missing service can never stop someone joining.
+// A4 adds a status column: a notification is 'sent' until the user looks at
+// it, then 'viewed'. The API keeps the A3 shape, with `unread` as the boolean
+// the screens already read, so nothing on the front end changed.
+//
+// notifyJoined and notifyAlmostReady are called by the queue module and their
+// result is ignored, exactly as in A3.
 
-import { store, findService, nextId } from '../data/store.js';
+import {
+  findService, nextId,
+  insertNotification, notificationsFor, markAllNotificationsViewed,
+} from '../data/store.js';
 import { ok, fail } from '../validation.js';
 
-/** The current time as 'HH:MM', matching the format used in the store. */
-function nowHHMM() {
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
+/** Database row -> the shape the front end has always received. */
+const forScreen = ({ id, message, time, status }) => ({
+  id, message, time, unread: status === 'sent',
+});
 
-/**
- * Adds one unread notification to the front of the list.
- *
- * New ones go at the front so that getNotifications can return the array as
- * it stands and still be newest first.
- */
 function add(userId, message) {
-  const notification = {
-    id: nextId('n'),
-    userId,
-    message,
-    time: nowHHMM(),
-    unread: true,
-  };
-
-  store.notifications.unshift(notification);
-  return ok(notification);
+  try {
+    return ok(forScreen(insertNotification({ id: nextId('n'), userId, message })));
+  } catch (error) {
+    // The foreign key on user_id rejects a notification for someone who does
+    // not exist. Report it rather than letting the constraint error escape.
+    return fail('Could not create that notification.', 400);
+  }
 }
 
 /** Someone joined a queue. */
@@ -51,11 +46,16 @@ export function notifyAlmostReady(userId, serviceId) {
   return add(userId, `You are next for ${service.name}. Please be ready.`);
 }
 
-/** One user's notifications, newest first. */
+/**
+ * One user's notifications, newest first.
+ *
+ * Reading them is what marks them viewed, which is why the rows are mapped
+ * before the update runs: the caller still sees which ones were unread at the
+ * moment they asked, and the next call will show them all as read. That is
+ * the sent -> viewed transition A4 asks for, with no new endpoint.
+ */
 export function getNotifications(userId) {
-  const mine = store.notifications
-    .filter((n) => n.userId === userId)
-    .map(({ id, message, time, unread }) => ({ id, message, time, unread }));
-
+  const mine = notificationsFor(userId).map(forScreen);
+  markAllNotificationsViewed(userId);
   return ok(mine);
 }
