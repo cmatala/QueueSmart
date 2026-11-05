@@ -164,6 +164,12 @@ describe('leaveQueue', ()=>{
 
     expect(getUserStatus('u2').data).toBeNull();
   });
+
+  test('frees the user to join another queue', ()=>{
+    leaveQueue('q1');
+
+    expect(joinQueue('u3', 's3').ok).toBe(true);
+  });
 });
 
 describe('serveNext', ()=>{
@@ -201,6 +207,12 @@ describe('serveNext', ()=>{
     const mine = notificationsFor('u2');
 
     expect(mine.some((n)=>n.message.includes('next for Academic Advising'))).toBe(true);
+  });
+
+  test('frees the served user to join another queue', ()=>{
+    serveNext('s1');
+
+    expect(joinQueue('u3', 's3').ok).toBe(true);
   });
 
   test('an empty queue returns 400', ()=>{
@@ -245,8 +257,8 @@ describe('moveEntry', ()=>{
 
   test('a reorder, a serve and a leave together still leave 1, 2', ()=>{
     moveEntry('q4', 'up');      
-    serveNext('s1');            
-    leaveQueue('q4');           
+    serveNext('s1');           
+    leaveQueue('q4');          
 
     expect(names(getQueue('s1'))).toEqual(['Alex Rivera', 'Amara Osei']);
     expect(positions('s1')).toEqual([1, 2]);
@@ -295,6 +307,22 @@ describe('moveEntry', ()=>{
     expect(names(getQueue('s2'))).toEqual(['Diego Santos', 'Noor Haddad']);
     expect(positions('s2')).toEqual([1, 2]);
   });
+
+  test('the swap is written to the database, not just the response', ()=>{
+    moveEntry('q2', 'up');
+
+    const q1 = db.prepare(`SELECT position FROM QueueEntry WHERE entry_id = 'q1'`).get();
+    const q2 = db.prepare(`SELECT position FROM QueueEntry WHERE entry_id = 'q2'`).get();
+    expect(q2.position).toBe(1);
+    expect(q1.position).toBe(2);
+  });
+
+  test('moving up then down puts it back', ()=>{
+    moveEntry('q3', 'up');
+    moveEntry('q3', 'down');
+
+    expect(names(getQueue('s1'))).toEqual(['Jordan Reyes', 'Alex Rivera', 'Amara Osei', 'Priya Nair']);
+  });
 });
 
 describe('getUserStatus', ()=>{
@@ -331,5 +359,21 @@ describe('getUserStatus', ()=>{
 
     expect(result.data.position).toBe(1);
     expect(result.data.status).toBe(STATUS.ALMOST_READY);
+  });
+});
+
+describe('persistence', ()=>{
+  test('a join is still there on a second connection', async()=>{
+    const { data } = joinQueue(FREE_USER, 's1');
+
+    const { default: Database } = await import('better-sqlite3');
+    const { DB_PATH } = await import('../db/connection.js');
+    const fresh = new Database(DB_PATH, { readonly: true });
+
+    const row = fresh.prepare('SELECT * FROM QueueEntry WHERE entry_id = ?').get(data.id);
+    fresh.close();
+
+    expect(row.user_id).toBe(FREE_USER);
+    expect(row.position).toBe(5);
   });
 });
