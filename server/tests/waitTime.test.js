@@ -1,7 +1,7 @@
 // OWNER: Valeriia
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { resetStore } from '../data/store.js';
+import { db, resetStore } from '../data/store.js';
 import { estimateWait, formatWait } from '../modules/waitTime.js';
 
 beforeEach(()=>{
@@ -15,8 +15,14 @@ describe('estimateWait', ()=>{
   });
 
   test('uses each service own duration', ()=>{
-    expect(estimateWait(2, 's2')).toBe(30);   
-    expect(estimateWait(2, 's3')).toBe(10);   
+    expect(estimateWait(2, 's2')).toBe(30);
+    expect(estimateWait(2, 's3')).toBe(10);
+  });
+
+  test('reads expected_duration from the Service table', ()=>{
+    db.prepare('UPDATE Service SET expected_duration = 30 WHERE service_id = ?').run('s1');
+
+    expect(estimateWait(2, 's1')).toBe(60);
   });
 
   test('the person at the front waits zero', ()=>{

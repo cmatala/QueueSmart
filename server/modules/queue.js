@@ -1,6 +1,10 @@
 // OWNER: Valeriia
 
-import { store, findService, findEntry, findUser, waitingFor, nextId, STATUS } from '../data/store.js';
+import {
+  findService, findEntry, findUser, waitingFor, findWaitingEntryForUser,
+  insertEntry, removeEntry, setEntryStatus, swapPositions, transaction,
+  nextId, STATUS,
+} from '../data/store.js';
 import { ok, fail, isOneOf } from '../validation.js';
 import { estimateWait } from './waitTime.js';
 import { notifyJoined, notifyAlmostReady } from './notifications.js';
@@ -8,26 +12,20 @@ import { addHistoryEntry } from './history.js';
 
 const DIRECTIONS = ['up', 'down'];
 
-function nowHHMM(){
-  const now = new Date();
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-}
+function minutesSince(timestamp){
+  const then = new Date(String(timestamp ?? '').replace(' ', 'T'));
+  if(Number.isNaN(then.getTime())) return 0;
 
-function minutesSince(hhmm){
-  const [h, m] = String(hhmm ?? '').split(':').map(Number);
-  if(!Number.isFinite(h) || !Number.isFinite(m)) return 0;
-
-  const now = new Date();
-  const minutes = now.getHours() * 60 + now.getMinutes() - (h * 60 + m);
+  const minutes = Math.round((Date.now() - then.getTime()) / 60000);
   return minutes > 0 ? minutes : 0;
 }
 
-function decorate(entry, index, serviceId){
+function forApi(entry){
+  const { queueId, joinedAtFull, ...rest } = entry;
   return{
-    ...entry,
-    position: index + 1,
+    ...rest,
     userName: findUser(entry.userId)?.name ?? 'Unknown',
-    wait: estimateWait(index, serviceId),
+    wait: estimateWait(entry.position - 1, entry.serviceId),
   };
 }
 
@@ -39,8 +37,7 @@ function findWaitingEntry(entryId){
 export function getQueue(serviceId){
   if(!findService(serviceId)) return fail('Service not found.', 404);
 
-  const entries = waitingFor(serviceId).map((entry, i)=>decorate(entry, i, serviceId));
-  return ok(entries);
+  return ok(waitingFor(serviceId).map(forApi));
 }
 
 export function joinQueue(userId, serviceId){
@@ -51,41 +48,35 @@ export function joinQueue(userId, serviceId){
 
   if(!service.isOpen) return fail('That queue is closed right now.');
 
-  const alreadyWaiting = store.queueEntries.some(
-    (e)=>e.userId === userId && e.status === STATUS.WAITING,
-  );
-  if(alreadyWaiting) return fail('You are already in a queue.');
+  if(findWaitingEntryForUser(userId)) return fail('You are already in a queue.');
 
-  const entry = {
-    id: nextId('q'),
-    userId,
-    serviceId,
-    joinedAt: nowHHMM(),
-    priority: service.priority,
-    status: STATUS.WAITING,
-  };
-
-  store.queueEntries.push(entry);
+  let entry;
+  try{
+    entry = insertEntry({ id: nextId('q'), serviceId, userId });
+  }
+  catch(error){
+    if(error.code === 'SQLITE_CONSTRAINT_UNIQUE') return fail('You are already in a queue.');
+    return fail('Could not join that queue.', 500);
+  }
 
   notifyJoined(userId, serviceId);
 
-  const position = waitingFor(serviceId).length;
-  return ok(decorate(entry, position - 1, serviceId));
+  return ok(forApi(entry));
 }
 
 export function leaveQueue(entryId){
   const entry = findWaitingEntry(entryId);
   if(!entry) return fail('Queue entry not found.', 404);
 
-  const index = store.queueEntries.indexOf(entry);
-  store.queueEntries.splice(index, 1);
-
-  addHistoryEntry({
-    userId: entry.userId,
-    serviceId: entry.serviceId,
-    outcome: STATUS.LEFT,
-    waitedMinutes: minutesSince(entry.joinedAt),
-  });
+  transaction(()=>{
+    removeEntry(entry.id);             
+    addHistoryEntry({
+      userId: entry.userId,
+      serviceId: entry.serviceId,
+      outcome: STATUS.LEFT,
+      waitedMinutes: minutesSince(entry.joinedAtFull),
+    });
+  })();
 
   return ok({ removed: true });
 }
@@ -96,19 +87,22 @@ export function serveNext(serviceId){
   const waiting = waitingFor(serviceId);
   if(waiting.length === 0) return fail('There is nobody waiting for this service.');
 
-  const served = waiting[0];
-  served.status = STATUS.SERVED;
+  const first = waiting[0];
 
-  addHistoryEntry({
-    userId: served.userId,
-    serviceId,
-    outcome: STATUS.SERVED,
-    waitedMinutes: minutesSince(served.joinedAt),
-  });
+  transaction(()=>{
+    setEntryStatus(first.id, STATUS.SERVED);
+    addHistoryEntry({
+      userId: first.userId,
+      serviceId,
+      outcome: STATUS.SERVED,
+      waitedMinutes: minutesSince(first.joinedAtFull),
+    });
+  })();
 
   const next = waitingFor(serviceId)[0];
   if(next) notifyAlmostReady(next.userId, serviceId);
 
+  const { queueId, joinedAtFull, position, ...served } = findEntry(first.id);
   return ok({
     ...served,
     userName: findUser(served.userId)?.name ?? 'Unknown',
@@ -123,34 +117,33 @@ export function moveEntry(entryId, direction){
   if(!entry) return fail('Queue entry not found.', 404);
 
   const waiting = waitingFor(entry.serviceId);
-  const here = waiting.indexOf(entry);
+  const here = waiting.findIndex((e)=>e.id === entry.id);
   const there = direction === 'up' ? here - 1 : here + 1;
 
   if(there < 0) return fail('That entry is already first in the queue.');
   if(there >= waiting.length) return fail('That entry is already last in the queue.');
 
-  const a = store.queueEntries.indexOf(waiting[here]);
-  const b = store.queueEntries.indexOf(waiting[there]);
-  [store.queueEntries[a], store.queueEntries[b]] = [store.queueEntries[b], store.queueEntries[a]];
+  try{
+    swapPositions(waiting[here].id, waiting[there].id);
+  }
+  catch{
+    return fail('Could not move that entry. The queue was not changed.', 500);
+  }
 
   return getQueue(entry.serviceId);
 }
 
 export function getUserStatus(userId){
-  const entry = store.queueEntries.find(
-    (e)=>e.userId === userId && e.status === STATUS.WAITING,
-  );
+  const entry = findWaitingEntryForUser(userId);
   if(!entry) return ok(null);
 
-  const waiting = waitingFor(entry.serviceId);
-  const index = waiting.indexOf(entry);
   const service = findService(entry.serviceId);
 
   return ok({
     service: service?.name ?? 'Unknown service',
-    position: index + 1,
-    wait: estimateWait(index, entry.serviceId),
-    status: index === 0 ? STATUS.ALMOST_READY : STATUS.WAITING,
+    position: entry.position,
+    wait: estimateWait(entry.position - 1, entry.serviceId),
+    status: entry.position === 1 ? STATUS.ALMOST_READY : STATUS.WAITING,
     serviceId: entry.serviceId,
     entryId: entry.id,
   });
