@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# SQLite database - everyone builds their own with npm run db:reset
+queuesmart*.db
+queuesmart*.db-*

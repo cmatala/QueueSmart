@@ -10,9 +10,12 @@
     "preview": "vite preview",
     "server": "node server/app.js",
     "test": "vitest run",
-    "coverage": "vitest run --coverage"
+    "coverage": "vitest run --coverage",
+    "db:reset": "node server/db/migrate.js"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^13.0.3",
     "express": "^5.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
