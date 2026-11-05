@@ -1,113 +1,158 @@
 // OWNER: Megan
 //
-// Tests for services.js - listServices, createService, updateService, setServiceOpen
-//
-// See store.test.js for a worked example. The shape of a test is always:
-// set up some data, call the function, check the result.
-//
-// The beforeEach below is REQUIRED. Our data lives in memory, so without it
-// one test's changes leak into the next and you get tests that pass alone but
-// fail when run together.
-//
-// The list of tests to write for this module is in the A3 task document.
-//
-// Tests for services.js - listServices, createService, updateService, setServiceOpen
+// Tests for services.js — listServices, createService, updateService, setServiceOpen
 
 import { describe, test, expect, beforeEach } from 'vitest';
 import { store, resetStore, findService } from '../data/store.js';
-import {
-  listServices,
-  createService,
-  updateService,
-  setServiceOpen,
-} from '../modules/services.js';
+import { listServices, createService, updateService, setServiceOpen } from '../modules/services.js';
 
 beforeEach(() => {
   resetStore();
 });
 
-// Assumes store.users holds users with a role of 'admin' or 'user'.
-const adminId = () => store.users.find((u) => u.role === 'admin').id;
-const userId = () => store.users.find((u) => u.role === 'user').id;
+const ADMIN = 'u1';
+const REGULAR = 'u2';
 
 const valid = {
-  name: 'Tutoring',
-  description: 'Peer tutoring sessions',
-  expectedDuration: 25,
+  name: 'Career Services',
+  description: 'Resume reviews and mock interviews.',
+  expectedDuration: 30,
   priority: 'medium',
 };
 
-describe('services', () => {
-  test('lists all four services, each with a waiting count', () => {
+describe('listServices', () => {
+  test('returns all four services', () => {
     const result = listServices();
 
     expect(result.ok).toBe(true);
     expect(result.data).toHaveLength(4);
-    expect(result.data.every((s) => typeof s.waiting === 'number')).toBe(true);
-    expect(result.data.find((s) => s.id === 's1').waiting).toBe(4);
   });
 
-  test('an administrator can create a service, and it is open with an id', () => {
-    const result = createService(valid, adminId());
+  test('adds a waiting count to each service', () => {
+    const { data } = listServices();
+    const byId = Object.fromEntries(data.map((s) => [s.id, s]));
+
+    expect(byId.s1.waiting).toBe(4);
+    expect(byId.s2.waiting).toBe(2);
+    expect(byId.s3.waiting).toBe(1);
+    expect(byId.s4.waiting).toBe(0);
+  });
+});
+
+describe('createService', () => {
+  test('an admin can create one, and it starts open', () => {
+    const result = createService(valid, ADMIN);
 
     expect(result.ok).toBe(true);
-    expect(result.data).toMatchObject({ name: 'Tutoring', isOpen: true, waiting: 0 });
-    expect(findService(result.data.id)).toBeTruthy();
-    expect(listServices().data).toHaveLength(5);
+    expect(result.data.name).toBe('Career Services');
+    expect(result.data.isOpen).toBe(true);
+    expect(result.data.waiting).toBe(0);
+    expect(store.services).toHaveLength(5);
   });
 
-  test('rejects an empty name and a 101-character name', () => {
-    const empty = createService({ ...valid, name: '' }, adminId());
-    const tooLong = createService({ ...valid, name: 'a'.repeat(101) }, adminId());
-    const exactly100 = createService({ ...valid, name: 'a'.repeat(100) }, adminId());
+  test('a regular user gets 403 and nothing is created', () => {
+    const result = createService(valid, REGULAR);
 
-    expect(empty.ok).toBe(false);
-    expect(empty.status).toBe(400);
-    expect(empty.error).toBe('Service name is required.');
-    expect(tooLong.ok).toBe(false);
-    expect(tooLong.status).toBe(400);
-    expect(exactly100.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe(403);
+    expect(store.services).toHaveLength(4);
   });
 
-  test('rejects a duration of 0, -5 or a decimal', () => {
-    for (const expectedDuration of [0, -5, 2.5]) {
-      const result = createService({ ...valid, expectedDuration }, adminId());
-      expect(result.ok).toBe(false);
-      expect(result.status).toBe(400);
-    }
+  test('rejects an empty name', () => {
+    const result = createService({ ...valid, name: '' }, ADMIN);
+
+    expect(result.status).toBe(400);
+    expect(result.error).toBe('Service name is required.');
   });
 
-  test('rejects an empty description and a priority that is not low, medium or high', () => {
-    const noDescription = createService({ ...valid, description: '' }, adminId());
-    const badPriority = createService({ ...valid, priority: 'urgent' }, adminId());
+  test('rejects a name of 101 characters', () => {
+    const result = createService({ ...valid, name: 'x'.repeat(101) }, ADMIN);
 
-    expect(noDescription.ok).toBe(false);
-    expect(noDescription.status).toBe(400);
-    expect(badPriority.ok).toBe(false);
-    expect(badPriority.status).toBe(400);
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('Service name must be 100 characters or fewer.');
   });
 
-  test('returns 403 when a non-administrator creates, updates or opens a service', () => {
-    const created = createService(valid, userId());
-    const updated = updateService('s1', valid, userId());
-    const toggled = setServiceOpen('s1', false, userId());
+  test('accepts a name of exactly 100 characters', () => {
+    const result = createService({ ...valid, name: 'x'.repeat(100) }, ADMIN);
 
-    expect(created.status).toBe(403);
-    expect(updated.status).toBe(403);
-    expect(toggled.status).toBe(403);
-    expect(listServices().data).toHaveLength(4);
+    expect(result.ok).toBe(true);
   });
 
-  test('updates a service, opens and closes its queue, and returns 404 for an unknown id', () => {
-    const updated = updateService('s1', { ...valid, name: 'Advising Plus' }, adminId());
-    const closed = setServiceOpen('s1', false, adminId());
-    const reopened = setServiceOpen('s4', true, adminId());
+  test('rejects a duration of 0, a negative one, and a fractional one', () => {
+    expect(createService({ ...valid, expectedDuration: 0 }, ADMIN).ok).toBe(false);
+    expect(createService({ ...valid, expectedDuration: -5 }, ADMIN).ok).toBe(false);
+    expect(createService({ ...valid, expectedDuration: 2.5 }, ADMIN).ok).toBe(false);
+  });
 
-    expect(updated.ok).toBe(true);
-    expect(updated.data.name).toBe('Advising Plus');
-    expect(closed.data.isOpen).toBe(false);
-    expect(reopened.data.isOpen).toBe(true);
-    expect(updateService('nope', valid, adminId()).status).toBe(404);
-    expect(setServiceOpen('nope', true, adminId()).status).toBe(404);
+  test('rejects a priority outside low, medium and high', () => {
+    const result = createService({ ...valid, priority: 'urgent' }, ADMIN);
+
+    expect(result.error).toBe('Priority must be one of: low, medium, high.');
+  });
+});
+
+describe('updateService', () => {
+  test('an admin can change the fields', () => {
+    const result = updateService('s3', { ...valid, expectedDuration: 45 }, ADMIN);
+
+    expect(result.ok).toBe(true);
+    expect(findService('s3').expectedDuration).toBe(45);
+    expect(findService('s3').name).toBe('Career Services');
+  });
+
+  test('an unknown id returns 404', () => {
+    const result = updateService('s99', valid, ADMIN);
+
+    expect(result.status).toBe(404);
+    expect(result.error).toBe('Service not found.');
+  });
+
+  test('a regular user gets 403 and nothing changes', () => {
+    const result = updateService('s3', valid, REGULAR);
+
+    expect(result.status).toBe(403);
+    expect(findService('s3').name).toBe('ID Card Services');
+  });
+
+  test('the same validation applies as when creating', () => {
+    const result = updateService('s3', { ...valid, description: '' }, ADMIN);
+
+    expect(result.status).toBe(400);
+  });
+});
+
+describe('setServiceOpen', () => {
+  test('an admin can close an open queue', () => {
+    const result = setServiceOpen('s1', false, ADMIN);
+
+    expect(result.ok).toBe(true);
+    expect(findService('s1').isOpen).toBe(false);
+  });
+
+  test('an admin can reopen a closed one', () => {
+    const result = setServiceOpen('s4', true, ADMIN);
+
+    expect(result.data.isOpen).toBe(true);
+  });
+
+  test('closing does not remove the people already waiting', () => {
+    setServiceOpen('s1', false, ADMIN);
+    const { data } = listServices();
+
+    expect(data.find((s) => s.id === 's1').waiting).toBe(4);
+  });
+
+  test('a regular user gets 403', () => {
+    expect(setServiceOpen('s1', false, REGULAR).status).toBe(403);
+  });
+
+  test('an unknown id returns 404', () => {
+    expect(setServiceOpen('s99', false, ADMIN).status).toBe(404);
+  });
+
+  test('rejects a value that is not true or false', () => {
+    const result = setServiceOpen('s1', 'yes', ADMIN);
+
+    expect(result.status).toBe(400);
   });
 });
