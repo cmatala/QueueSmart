@@ -136,6 +136,22 @@ a  { color: var(--blue-dark); }
 .nav-links a:hover { background: var(--blue-tint); color: var(--blue-dark); }
 .nav-links a.active { background: var(--blue); color: #fff; }
 
+/* Signed-in name and Sign out, set apart from the page links by a divider. */
+.nav-links { align-items: center; }
+
+.nav-account {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  margin-left: .5rem;
+  padding-left: .75rem;
+  border-left: 1px solid var(--line);
+}
+
+.nav-user { font-size: .92rem; color: var(--navy); font-weight: 550; padding: 0 .35rem; }
+
+.nav-account .btn-quiet { font-size: .92rem; font-weight: 400; padding: .35rem .6rem; }
+
 /* ---------- cards ---------- */
 
 .card {
@@ -350,6 +366,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .nav-inner { gap: .5rem; padding: .6rem 1rem; }
   .nav-links { margin-left: 0; width: 100%; }
   .nav-links a { font-size: .88rem; padding: .3rem .5rem; }
+  .nav-account { margin-left: auto; }
 
   /* Queue rows: number and name on top, buttons on a second line. */
   .queue-row { grid-template-columns: 2rem 1fr; row-gap: .5rem; }

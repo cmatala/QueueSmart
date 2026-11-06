@@ -46,10 +46,12 @@ export default function Navbar({ account, onSignOut }) {
               {link.label}
             </NavLink>
           ))}
-          <span className="faint" style={{ padding: '.35rem .6rem' }}>{account?.name}</span>
-          <button type="button" className="btn-quiet" onClick={handleSignOut}>
-            Sign out
-          </button>
+          <div className="nav-account">
+            <span className="nav-user">{account?.name}</span>
+            <button type="button" className="btn-quiet" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </nav>
