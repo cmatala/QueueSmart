@@ -4,8 +4,21 @@
 //
 // Every function returns ok(data) on success or fail(message, status) on
 // failure. The route file turns that into an HTTP response.
+//
+// A4: the data now lives in SQLite. This file holds no SQL; it calls the
+// functions in data/store.js, which run the queries. The names, arguments and
+// response shapes are the A3 ones, so the route file and the front end are
+// untouched.
 
-import { store, findService, waitingFor, nextId, PRIORITIES } from '../data/store.js';
+import {
+  allServices,
+  insertService,
+  updateServiceRow,
+  setServiceOpenRow,
+  findService,
+  nextId,
+  PRIORITIES,
+} from '../data/store.js';
 import { ok, fail, isRequired, maxLength, isPositiveNumber, isOneOf, firstError } from '../validation.js';
 import { requireAdmin } from './auth.js';
 
@@ -23,17 +36,35 @@ function checkFields({ name, description, expectedDuration, priority }) {
 }
 
 /**
+ * The store also returns queueId, which the A3 API never had. Drop it so the
+ * response has exactly the same fields as before.
+ */
+const toApi = ({ queueId, ...rest }) => rest;
+
+/** One service with its live waiting count, counted by the database. */
+const withWaiting = (id) => toApi(allServices().find((s) => s.id === id));
+
+/**
+ * Turns a database constraint error into a 400 message.
+ * Anything that is not a constraint error is a real bug, so it is rethrown.
+ */
+function constraintProblem(err) {
+  const code = typeof err?.code === 'string' ? err.code : '';
+  if (!code.startsWith('SQLITE_CONSTRAINT')) throw err;
+  if (code === 'SQLITE_CONSTRAINT_UNIQUE' && /Service\.name/.test(err.message)) {
+    return fail('A service with that name already exists.');
+  }
+  return fail('That service breaks a database rule.');
+}
+
+/**
  * Every service, each carrying how many people are waiting for it.
  *
- * The count is added here rather than in the screens so that the admin
- * dashboard and the join-queue list cannot disagree about it.
+ * The count comes from a COUNT in the database query (see allServices in
+ * store.js), not from counting an array here.
  */
 export function listServices() {
-  const services = store.services.map((service) => ({
-    ...service,
-    waiting: waitingFor(service.id).length,
-  }));
-  return ok(services);
+  return ok(allServices().map(toApi));
 }
 
 export function createService(fields = {}, userId) {
@@ -44,17 +75,20 @@ export function createService(fields = {}, userId) {
   const problem = checkFields(fields);
   if (problem) return fail(problem);
 
-  const service = {
-    id: nextId('s'),
-    name: String(fields.name).trim(),
-    description: String(fields.description).trim(),
-    expectedDuration: Number(fields.expectedDuration),
-    priority: fields.priority,
-    isOpen: true,
-  };
-
-  store.services.push(service);
-  return ok({ ...service, waiting: 0 });
+  try {
+    // insertService writes the Service row and its open Queue row in one
+    // transaction, so a service can never exist without its queue.
+    const created = insertService({
+      id: nextId('s'),
+      name: String(fields.name).trim(),
+      description: String(fields.description).trim(),
+      expectedDuration: Number(fields.expectedDuration),
+      priority: fields.priority,
+    });
+    return ok(withWaiting(created.id));
+  } catch (err) {
+    return constraintProblem(err);
+  }
 }
 
 export function updateService(id, fields = {}, userId) {
@@ -62,18 +96,23 @@ export function updateService(id, fields = {}, userId) {
     return fail('Only an administrator can manage services.', 403);
   }
 
-  const service = findService(id);
-  if (!service) return fail('Service not found.', 404);
+  if (!findService(id)) return fail('Service not found.', 404);
 
   const problem = checkFields(fields);
   if (problem) return fail(problem);
 
-  service.name = String(fields.name).trim();
-  service.description = String(fields.description).trim();
-  service.expectedDuration = Number(fields.expectedDuration);
-  service.priority = fields.priority;
-
-  return ok({ ...service, waiting: waitingFor(service.id).length });
+  try {
+    updateServiceRow({
+      id,
+      name: String(fields.name).trim(),
+      description: String(fields.description).trim(),
+      expectedDuration: Number(fields.expectedDuration),
+      priority: fields.priority,
+    });
+    return ok(withWaiting(id));
+  } catch (err) {
+    return constraintProblem(err);
+  }
 }
 
 /**
@@ -87,13 +126,12 @@ export function setServiceOpen(id, isOpen, userId) {
     return fail('Only an administrator can manage services.', 403);
   }
 
-  const service = findService(id);
-  if (!service) return fail('Service not found.', 404);
+  if (!findService(id)) return fail('Service not found.', 404);
 
   if (typeof isOpen !== 'boolean') {
     return fail('isOpen must be true or false.');
   }
 
-  service.isOpen = isOpen;
-  return ok({ ...service, waiting: waitingFor(service.id).length });
+  setServiceOpenRow(id, isOpen);
+  return ok(withWaiting(id));
 }
