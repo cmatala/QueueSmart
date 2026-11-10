@@ -26,3 +26,4 @@ dist-ssr
 # SQLite database - everyone builds their own with npm run db:reset
 queuesmart*.db
 queuesmart*.db-*
+coverage/
